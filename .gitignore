@@ -1,0 +1,32 @@
+# Entornos y dependencias
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secretos (nunca se suben)
+.env
+.env.local
+*.pem
+
+# IDE y sistema
+.idea/
+.vscode/
+.cursor/
+*.swp
+Thumbs.db
+.DS_Store
+
+# Salidas locales
+data/salida/
+*.log
+.coverage
+htmlcov/
+
+# Notebooks
+.ipynb_checkpoints/
