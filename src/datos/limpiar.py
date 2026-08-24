@@ -17,6 +17,7 @@ RECHAZADOS = Path("data/salida/tickets_rechazados.csv")
 RESUMEN = Path("data/salida/resumen_area_prioridad.csv")
 COLUMNAS_FECHA = ("fecha_creacion", "fecha_cierre")
 PRIORIDADES_VALIDAS = {"Alta", "Media", "Baja", "Crítica"}
+ORDEN_PRIORIDAD = ["Crítica", "Alta", "Media", "Baja"]
 AREA_SIN_DATO = "Sin área"
 
 # Solo escritura: mayúsculas y tildes. Sin uniones por asunto.
@@ -233,8 +234,11 @@ def resumir_area_prioridad(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=["area", "prioridad", "tickets"])
     tmp = df.copy()
     tmp["area"] = tmp["area"].replace("", AREA_SIN_DATO)
+    tmp["prioridad"] = pd.Categorical(
+        tmp["prioridad"], categories=ORDEN_PRIORIDAD, ordered=True
+    )
     return (
-        tmp.groupby(["area", "prioridad"], dropna=False)
+        tmp.groupby(["area", "prioridad"], dropna=False, observed=True)
         .size()
         .reset_index(name="tickets")
         .sort_values(["area", "prioridad"])

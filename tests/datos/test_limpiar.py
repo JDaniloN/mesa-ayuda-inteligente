@@ -3,6 +3,7 @@ import pytest
 
 from src.datos.limpiar import (
     AREA_SIN_DATO,
+    ORDEN_PRIORIDAD,
     eliminar_duplicados,
     exportar,
     motivo_rechazo,
@@ -174,6 +175,17 @@ def test_resumen_marca_sin_area():
     resumen = resumir_area_prioridad(df)
     assert AREA_SIN_DATO in set(resumen["area"])
     assert "Compras" in set(resumen["area"])
+
+
+def test_resumen_ordena_prioridad_por_severidad():
+    df = pd.DataFrame(
+        {
+            "area": ["Compras"] * 4,
+            "prioridad": ["Baja", "Crítica", "Media", "Alta"],
+        }
+    )
+    resumen = resumir_area_prioridad(df)
+    assert list(resumen["prioridad"]) == ORDEN_PRIORIDAD
 
 
 def test_exporta_separa_rechazados(tmp_path):
