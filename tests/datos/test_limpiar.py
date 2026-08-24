@@ -91,9 +91,10 @@ def test_prioridad_como_en_esquema():
     assert normalizar_prioridad("") == ""
 
 
-def test_reaperturas_vacias_son_cero():
-    assert normalizar_reaperturas("") == "0"
-    assert normalizar_reaperturas("  ") == "0"
+def test_reaperturas_vacias_se_quedan_vacias():
+    assert normalizar_reaperturas("") == ""
+    assert normalizar_reaperturas("  ") == ""
+    assert normalizar_reaperturas(None) == ""
     assert normalizar_reaperturas("2") == "2"
 
 
@@ -153,6 +154,7 @@ def test_exporta_fechas_normalizadas(tmp_path):
     assert df.loc[0, "categoria"] == "Nómina"
     assert len(df) == 2
     assert df.loc[1, "categoria"] == "Equipos"
+    assert df.loc[1, "reaperturas"] == ""
     assert df.loc[0, "asunto"] == "Pago"
     assert origen.read_text(encoding="utf-8").count("TK-00001") == 2
     assert (tmp_path / "resumen_area_prioridad.csv").exists()
@@ -182,6 +184,20 @@ def test_area_vacia_no_se_rechaza():
             "categoria": "",
             "prioridad": "Media",
             "reaperturas": "0",
+        }
+    )
+    assert motivo_rechazo(fila) is None
+
+
+def test_reaperturas_vacias_con_reabierto_no_se_rechazan():
+    fila = pd.Series(
+        {
+            "id": "TK-9",
+            "fecha_creacion": "2025-03-08",
+            "fecha_cierre": "",
+            "estado": "Reabierto",
+            "prioridad": "Alta",
+            "reaperturas": "",
         }
     )
     assert motivo_rechazo(fila) is None

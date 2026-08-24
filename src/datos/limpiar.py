@@ -184,13 +184,10 @@ def normalizar_prioridad(valor: Optional[str]) -> str:
 
 
 def normalizar_reaperturas(valor: Optional[str]) -> str:
-    """Vacío pasa a 0. El resto se deja como dígito."""
+    """Vacío se queda vacío: no se imputa 0 ni 1 (podría ser 2 o 3)."""
     if valor is None:
-        return "0"
-    texto = str(valor).strip()
-    if not texto:
-        return "0"
-    return texto
+        return ""
+    return str(valor).strip()
 
 
 def normalizar_solicitante(valor: Optional[str]) -> str:
@@ -280,7 +277,7 @@ def motivo_rechazo(fila: pd.Series) -> Optional[str]:
             return "canal no reconocido"
     if "reaperturas" in fila.index:
         reaps = str(fila.get("reaperturas", "")).strip()
-        if not reaps.isdigit():
+        if reaps and not reaps.isdigit():
             return "reaperturas no numérica"
     return None
 
