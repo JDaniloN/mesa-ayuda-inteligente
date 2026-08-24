@@ -8,12 +8,12 @@ Ingeniero IA Middle II.
 
 ## Hasta qué etapa llegué
 
-Etapa 0 hecha. Etapa 1 en curso: limpieza del CSV cerrada (faltan mock y SQL).
+Etapa 0 hecha. Etapa 1 en curso: limpieza del CSV y cliente del mock cerrados (falta SQL).
 
 | Estado | Etapa | Qué es |
 |---|---|---|
 | Hecha | 0. Contextualización | Entendí el enunciado, los materiales y el alcance Middle II |
-| En curso | 1. Fundamentos | CSV limpio, validación y resumen. Faltan mock y SQL |
+| En curso | 1. Fundamentos | CSV limpio y cliente del mock. Falta SQL |
 | Pendiente | 2. Autonomía e integración | API, clasificador desacoplado, legado |
 | Pendiente | 3. Complejidad y calidad | RAG, abstención, CI, seguridad |
 | Pendiente | 4. Arquitectura y orquestación | Diseño, ADR y demo mínima |
@@ -28,10 +28,10 @@ Etapa 0 hecha. Etapa 1 en curso: limpieza del CSV cerrada (faltan mock y SQL).
 | 1 | Tickets limpios | `data/salida/tickets_limpios.csv` | Abrir el CSV; no se versiona |
 | 1 | Rechazados | `data/salida/tickets_rechazados.csv` | Abrir el CSV; no se versiona |
 | 1 | Resumen área × prioridad | `data/salida/resumen_area_prioridad.csv` | Abrir el CSV; no se versiona |
-| 1 | Cliente del servicio mock | `src/integraciones/` | Pendiente al cerrar la etapa |
+| 1 | Cliente del servicio mock | `src/integraciones/cliente.py` | `python -m src.integraciones.cliente` (mock en 8080 y `MOCK_TOKEN`) |
 | 1 | Consultas SQL | `sql/` | Pendiente al cerrar la etapa |
 | 1 | Pruebas de limpieza | `tests/datos/test_limpiar.py` | `python -m pytest tests/datos/test_limpiar.py` |
-| 1 | Pruebas de integraciones | `tests/integraciones/` | Pendiente al cerrar la etapa |
+| 1 | Pruebas de integraciones | `tests/integraciones/` | `python -m pytest tests/integraciones/` |
 | 2 | API REST (crear, estado, listar) | `src/api/` | Pendiente al cerrar la etapa |
 | 2 | Clasificador desacoplado | `src/ia/` | Pendiente al cerrar la etapa |
 | 2 | Pruebas de API e IA | `tests/api/`, `tests/ia/` | Pendiente al cerrar la etapa |
@@ -67,7 +67,21 @@ materiales/         paquete original; no modificar mock ni PDF
 ```
 pip install -r requirements.txt
 python -m src.datos.limpiar
-python -m pytest tests/datos/
+python -m pytest tests/datos/ tests/integraciones/
+```
+
+Cliente del mock (el servidor simulado se levanta aparte y no se modifica):
+
+```
+cd materiales/servicio_mock
+pip install -r requirements.txt
+uvicorn app:app --port 8080
+```
+
+En otra terminal, con el token solo en el entorno (PowerShell: `$env:MOCK_TOKEN="demo-token-prueba-2026"`):
+
+```
+python -m src.integraciones.cliente
 ```
 
 El original está en `materiales/datos/tickets_historicos.csv` y no se modifica. La salida local (no se sube a Git) es `data/salida/`: limpio, rechazados y resumen área × prioridad.
@@ -94,4 +108,24 @@ Alternativa descartada: unir sinónimos (`Acceso`/`Accesos`/`Gestión de accesos
 
 **Rechazo.** id vacío; `fecha_creacion` vacía o ilegible; `fecha_cierre` ilegible o anterior a la creación; prioridad, categoría, estado o canal no reconocidos; `reaperturas` no numérica. Un archivo sin encabezado o inexistente lanza error explícito. Un CSV solo con cabecera produce salidas vacías, no un fallo.
 
-**Fuera de este entregable.** Consumo del mock y las tres consultas SQL (siguen pendientes en la etapa 1). No se unifican sinónimos de categoría. El original de `materiales/` no se toca.
+**Fuera de este entregable.** Las tres consultas SQL (siguen pendientes en la etapa 1). No se unifican sinónimos de categoría. El original de `materiales/` no se toca.
+
+### Etapa 1 — Cliente del servicio mock
+
+El cliente vive en `src/integraciones/`. El mock en `materiales/servicio_mock/` no se modifica: falla a propósito (latencia 0,1–2,5 s, 12 % de 500, 5 % de 429).
+
+**Librería.** `httpx`, con timeout de primer nivel. Alternativa descartada: `requests` en un script suelto (no reutilizable en la etapa 2).
+
+**Contrato.** Pydantic copia el esquema de `openapi.yaml` (`SolicitudEntrada` / `SolicitudSalida`). No se importa `app.py` del mock: ese código es el servidor, no una librería. Un asunto corto falla **antes** de gastar una llamada. Alternativa descartada: mandar `dict` y enterarse con un 422 dos segundos después.
+
+**Timeout.** 5 s (`MOCK_TIMEOUT`). El mock puede tardar 2,5 s en una respuesta buena; un timeout de 2 s confundiría latencia con fallo.
+
+**Reintentos.** Un reintento si el 429 trae `Retry-After`. El 500 no se reintenta aquí (el 12 % no se “gana” a pulso; el backoff queda para la etapa 4). El POST lleva `Idempotency-Key` para no duplicar si ese reintento se dispara.
+
+**Secretos.** Token solo en `MOCK_TOKEN`. URL opcional `MOCK_URL` (por defecto `http://localhost:8080`). El valor de prueba está en `materiales/servicio_mock/README.md`, no en `src/`.
+
+**Errores.** `httpx` no se filtra. Cada fallo es un `ErrorProveedor` con frase: timeout, sin conexión, 401 (sin imprimir el token), 404, 422, 429, 500. Un 200/201 con JSON roto también se traduce (no se traga un cuerpo inválido). El CLI imprime esa frase, cierra el cliente y sale con código 1.
+
+**Cómo se demuestra el criterio 4.** El mock real es aleatorio (~12 % de 500): el camino feliz en la terminal no basta. La evidencia de timeout, 401, 404, 429, 500 y cuerpo inválido está en `python -m pytest tests/integraciones/ -q`. En vivo, sin suerte: quite `MOCK_TOKEN` (401), apague uvicorn (sin conexión). `/docs` muestra el esquema; Execute **no manda** `authorization` (cabecera reservada). En PowerShell, `curl.exe -d "{...}"` parte el JSON; use el CLI o `Invoke-RestMethod`.
+
+**Fuera de este entregable.** Webhook `/webhook/mensajeria` (etapa 4). Reintentos con retroceso en 500. Las tres consultas SQL.
