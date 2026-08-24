@@ -2,6 +2,9 @@
 
 Lee y escribe con pandas. Las fechas usan reglas explícitas
 (no to_datetime a ciegas). No modifica el CSV original de materiales/.
+
+Categorías: catálogo de escritura (mayúsculas y tildes). No se unen
+sinónimos; las copias por id no cruzan esos pares. Vacío → Sin clasificar.
 """
 
 import unicodedata
@@ -19,9 +22,11 @@ COLUMNAS_FECHA = ("fecha_creacion", "fecha_cierre")
 PRIORIDADES_VALIDAS = {"Alta", "Media", "Baja", "Crítica"}
 ORDEN_PRIORIDAD = ["Crítica", "Alta", "Media", "Baja"]
 AREA_SIN_DATO = "Sin área"
+CATEGORIA_SIN_DATO = "Sin clasificar"
 
-# Solo escritura: mayúsculas y tildes. Sin uniones por asunto.
-# El vacío no se imputa.
+# Catálogo de escritura. Alternativa descartada: unir Acceso/Accesos/
+# Gestión de accesos (y pares similares). Las 39 ids repetidas no cruzan
+# esos pares; esquema.sql tampoco cubre Vacaciones, Capacitación ni Compras.
 CATEGORIAS_CANONICAS = {
     "acceso": "Acceso",
     "accesos": "Accesos",
@@ -45,6 +50,7 @@ CATEGORIAS_CANONICAS = {
     "vacaciones": "Vacaciones",
     "viaticos": "Viáticos",
 }
+CATEGORIAS_VALIDAS = set(CATEGORIAS_CANONICAS.values())
 
 # Mismo catálogo que esquema.sql: Alta, Media, Baja, Crítica.
 PRIORIDADES_CANONICAS = {
@@ -56,6 +62,24 @@ PRIORIDADES_CANONICAS = {
     "3-baja": "Baja",
     "critica": "Crítica",
 }
+
+ESTADOS_CANONICOS = {
+    "abierto": "Abierto",
+    "cerrado": "Cerrado",
+    "reabierto": "Reabierto",
+    "escalado": "Escalado",
+    "en proceso": "En proceso",
+}
+ESTADOS_VALIDOS = set(ESTADOS_CANONICOS.values())
+
+CANALES_CANONICOS = {
+    "correo": "Correo",
+    "telefono": "Teléfono",
+    "formulario": "Formulario",
+    "formulario web": "Formulario web",
+    "mesa de ayuda": "Mesa de ayuda",
+}
+CANALES_VALIDOS = set(CANALES_CANONICOS.values())
 
 MESES = {
     "ene": 1,
@@ -140,12 +164,12 @@ def clave_escritura(valor: Optional[str]) -> str:
 
 
 def normalizar_categoria(valor: Optional[str]) -> str:
-    """Unifica mayúsculas y tildes. Vacío se queda vacío."""
+    """Unifica mayúsculas y tildes. Vacío → Sin clasificar."""
     if valor is None:
-        return ""
+        return CATEGORIA_SIN_DATO
     texto = str(valor).strip()
     if not texto:
-        return ""
+        return CATEGORIA_SIN_DATO
     return CATEGORIAS_CANONICAS.get(clave_escritura(texto), texto)
 
 
@@ -179,6 +203,26 @@ def normalizar_solicitante(valor: Optional[str]) -> str:
     return texto
 
 
+def normalizar_estado(valor: Optional[str]) -> str:
+    """Unifica mayúsculas. Vacío se queda vacío."""
+    if valor is None:
+        return ""
+    texto = str(valor).strip()
+    if not texto:
+        return ""
+    return ESTADOS_CANONICOS.get(clave_escritura(texto), texto)
+
+
+def normalizar_canal(valor: Optional[str]) -> str:
+    """Unifica mayúsculas y tildes. No junta formulario con Formulario web."""
+    if valor is None:
+        return ""
+    texto = str(valor).strip()
+    if not texto:
+        return ""
+    return CANALES_CANONICOS.get(clave_escritura(texto), texto)
+
+
 def aplicar_fecha(valor: Optional[str]) -> str:
     """Normaliza o deja el texto si es ilegible, para validar después."""
     try:
@@ -198,8 +242,15 @@ def fecha_es_ilegible(valor: Optional[str]) -> bool:
     return False
 
 
+def _fecha_o_none(valor: Optional[str]) -> Optional[date]:
+    texto = "" if valor is None else str(valor).strip()
+    if not texto or fecha_es_ilegible(texto):
+        return None
+    return parsear_fecha(texto)
+
+
 def motivo_rechazo(fila: pd.Series) -> Optional[str]:
-    """None si el registro es válido. Área y categoría vacías no rechazan."""
+    """None si el registro es válido. Área vacía no rechaza."""
     if not str(fila.get("id", "")).strip():
         return "id vacío"
     if fecha_es_ilegible(fila.get("fecha_creacion")):
@@ -208,9 +259,25 @@ def motivo_rechazo(fila: pd.Series) -> Optional[str]:
         return "fecha_creacion vacía"
     if fecha_es_ilegible(fila.get("fecha_cierre")):
         return "fecha_cierre ilegible"
+    creacion = _fecha_o_none(fila.get("fecha_creacion"))
+    cierre = _fecha_o_none(fila.get("fecha_cierre"))
+    if creacion is not None and cierre is not None and cierre < creacion:
+        return "fecha_cierre anterior a fecha_creacion"
     if "prioridad" in fila.index:
         if str(fila.get("prioridad", "")).strip() not in PRIORIDADES_VALIDAS:
             return "prioridad no reconocida"
+    if "categoria" in fila.index:
+        categoria = str(fila.get("categoria", "")).strip()
+        if categoria and categoria not in CATEGORIAS_VALIDAS:
+            return "categoria no reconocida"
+    if "estado" in fila.index:
+        estado = str(fila.get("estado", "")).strip()
+        if estado and estado not in ESTADOS_VALIDOS:
+            return "estado no reconocido"
+    if "canal" in fila.index:
+        canal = str(fila.get("canal", "")).strip()
+        if canal and canal not in CANALES_VALIDOS:
+            return "canal no reconocido"
     if "reaperturas" in fila.index:
         reaps = str(fila.get("reaperturas", "")).strip()
         if not reaps.isdigit():
@@ -274,7 +341,9 @@ def exportar(
         resumen = limpio.parent / RESUMEN.name
 
     try:
-        df = pd.read_csv(origen, dtype=str, keep_default_na=False)
+        df = pd.read_csv(origen, dtype=str, keep_default_na=False, encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise ValueError(f"No se encontró el CSV: {origen}") from exc
     except pd.errors.EmptyDataError as exc:
         raise ValueError("El CSV no tiene encabezado") from exc
     if df.empty and not list(df.columns):
@@ -288,6 +357,10 @@ def exportar(
         df["categoria"] = df["categoria"].map(normalizar_categoria)
     if "prioridad" in df.columns:
         df["prioridad"] = df["prioridad"].map(normalizar_prioridad)
+    if "estado" in df.columns:
+        df["estado"] = df["estado"].map(normalizar_estado)
+    if "canal" in df.columns:
+        df["canal"] = df["canal"].map(normalizar_canal)
     if "reaperturas" in df.columns:
         df["reaperturas"] = df["reaperturas"].map(normalizar_reaperturas)
     if "solicitante" in df.columns:

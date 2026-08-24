@@ -3,11 +3,14 @@ import pytest
 
 from src.datos.limpiar import (
     AREA_SIN_DATO,
+    CATEGORIA_SIN_DATO,
     ORDEN_PRIORIDAD,
     eliminar_duplicados,
     exportar,
     motivo_rechazo,
+    normalizar_canal,
     normalizar_categoria,
+    normalizar_estado,
     normalizar_fecha,
     normalizar_prioridad,
     normalizar_reaperturas,
@@ -74,7 +77,8 @@ def test_categoria_no_junta_sinonimos():
     assert normalizar_categoria("Reportes") == "Reportes"
     assert normalizar_categoria("Otros") == "Otros"
     assert normalizar_categoria("Sin clasificar") == "Sin clasificar"
-    assert normalizar_categoria("") == ""
+    assert normalizar_categoria("") == CATEGORIA_SIN_DATO
+    assert normalizar_categoria(None) == CATEGORIA_SIN_DATO
 
 
 def test_prioridad_como_en_esquema():
@@ -98,6 +102,24 @@ def test_solicitante_vacio_es_no_identificado():
     assert normalizar_solicitante("usuario@lafortuna.com.co") == "usuario@lafortuna.com.co"
 
 
+def test_estado_unifica_escritura():
+    assert normalizar_estado("ABIERTO") == "Abierto"
+    assert normalizar_estado("reabierto") == "Reabierto"
+    assert normalizar_estado("CERRADO") == "Cerrado"
+    assert normalizar_estado("en proceso") == "En proceso"
+    assert normalizar_estado("Escalado") == "Escalado"
+    assert normalizar_estado("") == ""
+
+
+def test_canal_unifica_escritura():
+    assert normalizar_canal("correo") == "Correo"
+    assert normalizar_canal("Telefono") == "Teléfono"
+    assert normalizar_canal("TELÉFONO") == "Teléfono"
+    assert normalizar_canal("formulario") == "Formulario"
+    assert normalizar_canal("Formulario web") == "Formulario web"
+    assert normalizar_canal("mesa de ayuda") == "Mesa de ayuda"
+
+
 def test_elimina_duplicados_por_id():
     df = pd.DataFrame(
         {
@@ -114,8 +136,8 @@ def test_exporta_fechas_normalizadas(tmp_path):
     origen = tmp_path / "entrada.csv"
     origen.write_text(
         "id,fecha_creacion,fecha_cierre,area,categoria,asunto,prioridad,reaperturas\n"
-        "TK-00001,20-Ene-2026,03/06/2025,Compras,NOMINA,Pago ,Alta,0\n"
-        "TK-00001,20-Ene-2026,03/06/2025,Compras,nomina,Pago,Alta,0\n"
+        "TK-00001,20-Ene-2026,03/06/2026,Compras,NOMINA,Pago ,Alta,0\n"
+        "TK-00001,20-Ene-2026,03/06/2026,Compras,nomina,Pago,Alta,0\n"
         "TK-00002,2025-03-08,,Calidad,equipos,Teclado,Baja,\n",
         encoding="utf-8",
     )
@@ -125,7 +147,7 @@ def test_exporta_fechas_normalizadas(tmp_path):
 
     df = pd.read_csv(limpio, dtype=str, keep_default_na=False)
     assert df.loc[0, "fecha_creacion"] == "2026-01-20"
-    assert df.loc[0, "fecha_cierre"] == "2025-06-03"
+    assert df.loc[0, "fecha_cierre"] == "2026-06-03"
     assert df.loc[1, "fecha_creacion"] == "2025-03-08"
     assert df.loc[1, "fecha_cierre"] == ""
     assert df.loc[0, "categoria"] == "Nómina"
@@ -165,6 +187,33 @@ def test_area_vacia_no_se_rechaza():
     assert motivo_rechazo(fila) is None
 
 
+def test_rechaza_cierre_antes_de_creacion():
+    fila = pd.Series(
+        {
+            "id": "TK-9",
+            "fecha_creacion": "2026-03-08",
+            "fecha_cierre": "2025-01-01",
+            "prioridad": "Alta",
+            "reaperturas": "0",
+        }
+    )
+    assert motivo_rechazo(fila) == "fecha_cierre anterior a fecha_creacion"
+
+
+def test_rechaza_categoria_desconocida():
+    fila = pd.Series(
+        {
+            "id": "TK-9",
+            "fecha_creacion": "2025-03-08",
+            "fecha_cierre": "",
+            "categoria": "Inventada",
+            "prioridad": "Alta",
+            "reaperturas": "0",
+        }
+    )
+    assert motivo_rechazo(fila) == "categoria no reconocida"
+
+
 def test_resumen_marca_sin_area():
     df = pd.DataFrame(
         {
@@ -202,3 +251,63 @@ def test_exporta_separa_rechazados(tmp_path):
     mal = pd.read_csv(tmp_path / "tickets_rechazados.csv", dtype=str, keep_default_na=False)
     assert list(ok["id"]) == ["TK-OK"]
     assert mal.loc[0, "motivo"] == "id vacío"
+
+
+def test_exporta_fecha_invalida_a_rechazados(tmp_path):
+    origen = tmp_path / "entrada.csv"
+    origen.write_text(
+        "id,fecha_creacion,fecha_cierre,area,categoria,prioridad,reaperturas\n"
+        "TK-OK,2025-03-08,,Compras,Nómina,Alta,0\n"
+        "TK-MAL,ayer,,Compras,Nómina,Alta,0\n",
+        encoding="utf-8",
+    )
+    limpio = tmp_path / "tickets_limpios.csv"
+    exportar(origen=origen, limpio=limpio)
+    ok = pd.read_csv(limpio, dtype=str, keep_default_na=False)
+    mal = pd.read_csv(tmp_path / "tickets_rechazados.csv", dtype=str, keep_default_na=False)
+    assert list(ok["id"]) == ["TK-OK"]
+    assert mal.loc[0, "motivo"] == "fecha_creacion ilegible"
+
+
+def test_exporta_archivo_vacio(tmp_path):
+    origen = tmp_path / "vacio.csv"
+    origen.write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match="encabezado"):
+        exportar(origen=origen, limpio=tmp_path / "tickets_limpios.csv")
+
+
+def test_exporta_solo_encabezado(tmp_path):
+    origen = tmp_path / "solo_cabecera.csv"
+    origen.write_text(
+        "id,fecha_creacion,fecha_cierre,area,categoria,prioridad\n",
+        encoding="utf-8",
+    )
+    limpio = tmp_path / "tickets_limpios.csv"
+    exportar(origen=origen, limpio=limpio)
+    ok = pd.read_csv(limpio, dtype=str, keep_default_na=False)
+    mal = pd.read_csv(tmp_path / "tickets_rechazados.csv", dtype=str, keep_default_na=False)
+    resumen = pd.read_csv(tmp_path / "resumen_area_prioridad.csv", dtype=str, keep_default_na=False)
+    assert ok.empty
+    assert mal.empty
+    assert list(resumen.columns) == ["area", "prioridad", "tickets"]
+    assert resumen.empty
+
+
+def test_exporta_archivo_inexistente(tmp_path):
+    with pytest.raises(ValueError, match="No se encontró"):
+        exportar(origen=tmp_path / "no_existe.csv", limpio=tmp_path / "tickets_limpios.csv")
+
+
+def test_exporta_categoria_vacia_es_sin_clasificar(tmp_path):
+    origen = tmp_path / "entrada.csv"
+    origen.write_text(
+        "id,fecha_creacion,fecha_cierre,area,categoria,prioridad,estado,canal,reaperturas\n"
+        "TK-1,2025-03-08,,Compras,,Alta,abierto,correo,0\n",
+        encoding="utf-8",
+    )
+    limpio = tmp_path / "tickets_limpios.csv"
+    exportar(origen=origen, limpio=limpio)
+    df = pd.read_csv(limpio, dtype=str, keep_default_na=False)
+    assert df.loc[0, "categoria"] == CATEGORIA_SIN_DATO
+    assert df.loc[0, "estado"] == "Abierto"
+    assert df.loc[0, "canal"] == "Correo"
