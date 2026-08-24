@@ -63,8 +63,9 @@ El README de esta etapa cubre lo que pide el enunciado: **cómo instalar, cómo 
 | 1 | Consultas SQL | `sql/` | `python sql/correr.py` |
 | 1 | Resultado de las consultas | `data/salida/consulta_*.csv` | Abrir los CSV; no se versionan |
 | 1 | Aclaraciones de sustentación | `docs/aclaraciones_sustentacion.md` | Abrir el archivo |
-| 1 | Pruebas de limpieza | `tests/datos/test_limpiar.py` | `python -m pytest tests/datos/test_limpiar.py` |
+| 1 | Pruebas de limpieza | `tests/datos/test_limpiar.py` | `python -m pytest tests/datos/` |
 | 1 | Pruebas de integraciones | `tests/integraciones/` | `python -m pytest tests/integraciones/` |
+| 1 | Pruebas de las consultas SQL | `tests/sql/` | `python -m pytest tests/sql/` |
 | 2–5 | API, IA, RAG, orquestación, ADR | `src/`, `tests/`, `docs/`, `ci/` | Pendiente al cerrar cada etapa |
 | Todas | Paquete original (solo lectura) | `materiales/` | No se modifica |
 
@@ -165,10 +166,12 @@ Get-Content sql/01_agregacion_por_area.sql -Raw | mysql -u root -p -t mesa_ayuda
 **Pruebas**
 
 ```
-python -m pytest tests/datos/ tests/integraciones/ -q
+python -m pytest tests/datos/ tests/integraciones/ tests/sql/ -q
 ```
 
-El mock real es aleatorio (~12 % de 500): el camino feliz en la terminal no basta. La evidencia de timeout, 401, 404, 429, 500 y cuerpo inválido está en las pruebas. En vivo, sin suerte: quite `MOCK_TOKEN` (401) o apague uvicorn (sin conexión).
+El enunciado pide **al menos tres funciones y un caso de borde**. Ya está cubierto: `normalizar_fecha`, `normalizar_categoria` y `eliminar_duplicados`, con bordes (fecha ilegible, archivo vacío o inexistente, `reaperturas` vacía). El mock añade timeout, 401, 404, 429, 500 y JSON roto. `tests/sql/` fija 8 / 120 / 36 y dos bordes del esquema feliz: un área sin tickets no desaparece; un reabierto sin paso en el log igual sale.
+
+El mock real es aleatorio (~12 % de 500): el camino feliz en la terminal no basta. En vivo, sin suerte: quite `MOCK_TOKEN` (401) o apague uvicorn (sin conexión).
 
 ---
 
@@ -214,7 +217,7 @@ Tres archivos sobre `esquema.sql` (120 tickets; **otro dataset** que el CSV):
 
 **SQL — motor.** El enunciado pide SQL estándar. El encabezado de `esquema.sql` lo verifica en MySQL/MariaDB; no exige instalar un servidor. En este Windows no hay cliente `mysql`. `correr.py` usa SQLite en memoria sobre una **copia** del mismo archivo. Las `.sql` se pueden pegar en MySQL sin reescribirlas.
 
-**SQL — 01.** Parte de `areas` (`LEFT JOIN`) para no ocultar un área sin tickets. No cerrados = todo lo que no está `Cerrado`.
+**SQL — 01.** Parte de `areas` (`LEFT JOIN`) para no ocultar un área sin tickets. `COALESCE` deja 0, no NULL, si el área no tiene filas. No cerrados = todo lo que no está `Cerrado`.
 
 **SQL — 02.** `tickets` + `usuarios` + `areas` (quién pidió qué). `INNER JOIN`: en este esquema todo ticket tiene usuario y área (`FK NOT NULL`).
 

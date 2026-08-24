@@ -74,6 +74,73 @@ Conjunto: `reaperturas > 0`. El historial es `LEFT JOIN` (si no hay paso a Reabi
 
 ---
 
+## Las tres funciones del enunciado (pruebas unitarias)
+
+El enunciado pide **tres funciones y un caso de borde**. Función = un `def` en Python, no el script entero. Unitaria = se llama sola, con datos inventados, sin el CSV de 2.000 ni el mock en 8080. Borde = lo que no es el camino feliz.
+
+Las tres que enseño: `normalizar_fecha`, `normalizar_categoria`, `eliminar_duplicados` en `src/datos/limpiar.py`. Tests en `tests/datos/test_limpiar.py`.
+
+```
+python -m pytest tests/datos/test_limpiar.py -q
+python -m pytest tests/datos/test_limpiar.py -k "fecha or categoria or duplicados" -q
+```
+
+Si piden “muéstrame un borde en vivo”: `test_fecha_invalida_lanza_error` (`32/13/2025`) o `test_exporta_archivo_inexistente`.
+
+---
+
+### 1. `normalizar_fecha`
+
+**Qué hace.** Convierte los tres formatos del material a `YYYY-MM-DD`. Vacío se queda vacío (ticket sin cierre). Ilegible no se “adivina”: `parsear_fecha` lanza `ValueError` y la fila va a rechazados.
+
+**Cómo lo digo.** *El enunciado dice tres formatos. No usé `to_datetime` a ciegas porque mezcla día/mes. Cada formato tiene su parser. Vacío no es error; “ayer” sí.*
+
+**Feliz.** `"2025-03-08"` → igual. `"03/06/2025"` → `"2025-06-03"` (día/mes, no el de EE. UU.). `"20-Ene-2026"` → `"2026-01-20"`.
+
+**Borde.** `""` → `""`. `"32/13/2025"` y `"ayer"` → `ValueError`. Test: `test_vacio_queda_vacio`, `test_fecha_invalida_lanza_error`.
+
+**Qué descarté.** `pandas.to_datetime(..., errors="coerce")`: el `03/06` ambiguo y el `Ene` en español se silencian o se interpretan mal.
+
+**Si me piden cambiarla en vivo.** Que `"  07/03/2026  "` recorte espacios (ya lo hace) o que un cuarto formato se rechace, no se parchee.
+
+---
+
+### 2. `normalizar_categoria`
+
+**Qué hace.** Unifica **escritura** (mayúsculas y tildes) con un catálogo explícito. Vacío → `Sin clasificar` (esa etiqueta ya existe en el CSV). No une sinónimos.
+
+**Cómo lo digo.** *SOFTWARE y software son la misma categoría mal escrita. Acceso y Accesos pueden ser dos colas distintas. Uní lo primero; no inventé lo segundo. Lo comprobé con las 39 ids repetidas: solo cambiaban mayúsculas.*
+
+**Feliz.** `"SOFTWARE"` → `"Software"`. `"nomina"` / `"NOMINA"` → `"Nómina"`.
+
+**Borde.** `""` y `None` → `"Sin clasificar"`. `"Acceso"` sigue Acceso y `"accesos"` sigue Accesos. Test: `test_categoria_unifica_escritura`, `test_categoria_no_junta_sinonimos`.
+
+**Qué descarté.** Un mapa Acceso/Accesos/Gestión de accesos (`validar_uniones.py` no lo sostiene). Recortar al catálogo de `esquema.sql` (no trae Vacaciones, Capacitación ni Compras).
+
+**Si me piden unir sinónimos en vivo.** No lo hago sin evidencia. Si insisten: un diccionario aparte, no tocar el catálogo de escritura, y una prueba que falle antes.
+
+---
+
+### 3. `eliminar_duplicados`
+
+**Qué hace.** Una fila por `id`, se queda la **primera**. En este CSV las copias son el mismo ticket; la diferencia era mayúsculas de categoría (ya normalizada antes).
+
+**Cómo lo digo.** *Duplicado en mesa de ayuda es el mismo caso, no dos personas. Keep first es determinista. Si uniera sinónimos antes de deduplicar, estaría inventando que Hardware y Equipos son el mismo ticket; en las 39 ids no ocurría.*
+
+**Feliz.** Tres filas, dos con el mismo `id` → dos filas. Test: `test_elimina_duplicados_por_id`.
+
+**Borde.** DataFrame sin columna `id`: no revienta, devuelve el mismo `df`. El borde de archivo (vacío, solo encabezado, inexistente) está en `exportar`: `test_exporta_archivo_vacio`, `test_exporta_solo_encabezado`, `test_exporta_archivo_inexistente`.
+
+**Qué descarté.** Quedarme con la última (`keep="last"`): no hay regla de negocio que la última sea la “más correcta”. Fusionar columnas distintas: aquí no había conflicto real.
+
+**Si me piden keep last en vivo.** Una línea en `drop_duplicates(..., keep="last")` y cambiar el test. Diría antes: *en este histórico no cambia el conteo de ids únicos; cambia cuál copia sobrevive si algún día difieren.*
+
+---
+
+**Cierre si preguntan “¿y el resto de tests?”** El mínimo son esas tres. El 4 está en los bordes de `exportar` y en `tests/sql/` (8 / 120 / 36; área sin tickets; reabierto sin log). El mock no cuenta para este ítem: es otro criterio (consumo de API).
+
+---
+
 ## Otras preguntas fijas (etapa 1)
 
 ### ¿Por qué no filtraste `estado = 'Reabierto'`?
