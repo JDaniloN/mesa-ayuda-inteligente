@@ -41,6 +41,14 @@ Una fila por cada área del catálogo (LEFT JOIN desde `areas`).
 
 Lectura: 8 áreas, 120 tickets en total. Operaciones es la que más reabre (promedio 0.94). Calidad casi no (0.09) y ninguna de sus 11 está cerrada.
 
+**`COALESCE` (no cambia estas 8 filas).** `LEFT JOIN` hace que un área sin tickets **aparezca**. `COUNT` de cero filas es 0; `SUM` y `AVG` son `NULL`. `COALESCE(..., 0)` deja ceros, no huecos. En este esquema las 8 áreas tienen tickets: el resultado es el mismo. El borde se ve en `test_agregacion_area_sin_tickets_no_desaparece` (inserta `Área sin carga`).
+
+**Cómo lo digo:** *El JOIN evita que el área desaparezca. El COALESCE evita que el indicador quede nulo. Son dos fallos distintos. En este catálogo no se nota; el día que den de alta un área sin tickets, el dashboard no muestra “vacío”.*
+
+**Qué descarté.** Dejar `NULL` y documentarlo: un promedio nulo no es “cero reaperturas”, es “no hay dato”. Aquí el negocio pide conteo por área, no un nulo. `IFNULL` es de MySQL; `COALESCE` es SQL estándar.
+
+**Si piden quitarlo en vivo.** Se quitan las dos llamadas a `COALESCE` en `sql/01_agregacion_por_area.sql`. Las 8 filas no cambian. Hay que ajustar el test del área fantasma: `no_cerrados` y `reaperturas_promedio` pasarían a `None`.
+
 ### 02 — Join de tres tablas (120 filas)
 
 `tickets` + `usuarios` + `areas`. Muestra: código, asunto, estado, prioridad, fecha, nombre y correo del solicitante, si el usuario está activo, área y sede.
@@ -143,6 +151,10 @@ Si piden “muéstrame un borde en vivo”: `test_fecha_invalida_lanza_error` (`
 
 ## Otras preguntas fijas (etapa 1)
 
+### ¿Por qué `COALESCE` en la consulta 01?
+
+Porque `LEFT JOIN` y `SUM`/`AVG` no arreglan lo mismo. El join saca el área; `COUNT` ya da 0; `SUM` y `AVG` de cero filas dan `NULL`. `COALESCE(..., 0)` pone ceros. En las 8 filas actuales no se ve: todas las áreas tienen tickets. La prueba inserta un área vacía. No usé `IFNULL`: no es SQL estándar.
+
 ### ¿Por qué no filtraste `estado = 'Reabierto'`?
 
 Porque eso es la foto de hoy, no el hecho. *Reabierto es un estado; reaperturas es un hecho. Pregunté por el hecho. El historial solo aporta la fecha, y si el log está incompleto no borro el ticket.*
@@ -190,3 +202,33 @@ Execute **no manda** la cabecera `authorization` (Swagger la trata como reservad
 ### ¿Dónde está el token?
 
 Solo en `MOCK_TOKEN`. No va en el repo. El valor de prueba está en `materiales/servicio_mock/README.md`.
+
+---
+
+## API propia (etapa 2)
+
+OpenAPI: `http://127.0.0.1:8000/docs`. Token: `API_TOKEN` (no el del mock). Candado **Authorize**; el mock usaba un Header `authorization` y Execute no lo mandaba.
+
+### ¿Por qué el listado vacío es 200 y no 404?
+
+`GET /solicitudes?area=Vacaciones` es un **filtro sobre la colección**. Cero filas es un resultado válido: **200** `[]`. `GET /solicitudes/SOL-NOEXISTE` es **un recurso**: **404** `no_encontrado`.
+
+**Cómo lo digo:** *404 es “esta solicitud no existe”. 200 vacío es “no hay ninguna que cumpla el filtro”. Si el listado devolviera 404, el tablero vacío se confundiría con una ruta rota.*
+
+Vacaciones es categoría, no área. Hasta el clasificador, la prioridad stub es Media: filtrar `prioridad=Alta` también da `[]`.
+
+### ¿Por qué FastAPI y no Flask?
+
+OpenAPI y validación salen del contrato Pydantic. Flask habría sido más código para el mismo 422.
+
+### ¿Por qué memoria y no SQLite?
+
+El enunciado de este ítem pide recursos y códigos, no el modelo relacional (etapa 4). Al reiniciar se pierde el listado; está declarado.
+
+### ¿Por qué 503 si falta API_TOKEN?
+
+Sin secreto configurado el servicio no está listo. Un 401 haría pensar que el cliente se equivocó de token.
+
+### `/health`
+
+Como el mock: sin token, `estado: operativo`. No usa etiqueta `salud`.

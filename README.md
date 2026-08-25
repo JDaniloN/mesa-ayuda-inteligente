@@ -43,7 +43,7 @@ Etapa 0 hecha. Etapa 1: CSV, mock y SQL cerrados. Falta llenar a mano la declara
 |---|---|---|
 | Hecha | 0. Contextualización | Enunciado, materiales y alcance Middle II |
 | En curso | 1. Fundamentos | Limpieza del CSV, cliente del mock y tres consultas SQL |
-| Pendiente | 2. Autonomía e integración | API, clasificador desacoplado, legado |
+| En curso | 2. Autonomía e integración | API propia (tres recursos). Faltan IA, legado y Angular |
 | Pendiente | 3. Complejidad y calidad | RAG, abstención, CI, seguridad |
 | Pendiente | 4. Arquitectura y orquestación | Diseño, ADR y demo mínima |
 | Pendiente | 5. Estrategia y evaluación | Decisión, métricas previas, ML clásico |
@@ -66,7 +66,8 @@ El README de esta etapa cubre lo que pide el enunciado: **cómo instalar, cómo 
 | 1 | Pruebas de limpieza | `tests/datos/test_limpiar.py` | `python -m pytest tests/datos/` |
 | 1 | Pruebas de integraciones | `tests/integraciones/` | `python -m pytest tests/integraciones/` |
 | 1 | Pruebas de las consultas SQL | `tests/sql/` | `python -m pytest tests/sql/` |
-| 2–5 | API, IA, RAG, orquestación, ADR | `src/`, `tests/`, `docs/`, `ci/` | Pendiente al cerrar cada etapa |
+| 2 | API propia (crear, estado, listar) | `src/api/` | `python -m pytest tests/api/` |
+| 2–5 | IA, RAG, orquestación, ADR | `src/`, `tests/`, `docs/`, `ci/` | Pendiente al cerrar cada etapa |
 | Todas | Paquete original (solo lectura) | `materiales/` | No se modifica |
 
 ## Estructura
@@ -99,7 +100,7 @@ Python 3 con `pip`. Desde la raíz del repositorio:
 pip install -r requirements.txt
 ```
 
-Dependencias de esta etapa: `pandas`, `pytest`, `httpx`, `pydantic`. SQLite viene con Python; no hay que instalar un motor SQL para comprobar las consultas.
+Dependencias de esta etapa: `pandas`, `pytest`, `httpx`, `pydantic`, `fastapi`, `uvicorn`. SQLite viene con Python; no hay que instalar un motor SQL para comprobar las consultas.
 
 El mock es un proceso aparte y no se modifica. Sus dependencias:
 
@@ -115,6 +116,12 @@ $env:MOCK_TOKEN="demo-token-prueba-2026"
 ```
 
 Opcional: `$env:MOCK_URL` (por defecto `http://localhost:8080`) y `$env:MOCK_TIMEOUT` (por defecto 5 segundos).
+
+Token de la API propia (no es el del mock). En PowerShell:
+
+```
+$env:API_TOKEN="demo-api-local"
+```
 
 ---
 
@@ -166,12 +173,25 @@ Get-Content sql/01_agregacion_por_area.sql -Raw | mysql -u root -p -t mesa_ayuda
 **Pruebas**
 
 ```
-python -m pytest tests/datos/ tests/integraciones/ tests/sql/ -q
+python -m pytest tests/datos/ tests/integraciones/ tests/sql/ tests/api/ -q
 ```
 
 El enunciado pide **al menos tres funciones y un caso de borde**. Ya está cubierto: `normalizar_fecha`, `normalizar_categoria` y `eliminar_duplicados`, con bordes (fecha ilegible, archivo vacío o inexistente, `reaperturas` vacía). El mock añade timeout, 401, 404, 429, 500 y JSON roto. `tests/sql/` fija 8 / 120 / 36 y dos bordes del esquema feliz: un área sin tickets no desaparece; un reabierto sin paso en el log igual sale.
 
 El mock real es aleatorio (~12 % de 500): el camino feliz en la terminal no basta. En vivo, sin suerte: quite `MOCK_TOKEN` (401) o apague uvicorn (sin conexión).
+
+**API propia (etapa 2, este ítem)**
+
+```
+$env:API_TOKEN="demo-api-local"
+python -m uvicorn src.api.app:app --port 8000
+```
+
+OpenAPI: http://127.0.0.1:8000/docs — Bearer `API_TOKEN`. Tres recursos: `POST /solicitudes`, `GET /solicitudes/{id}`, `GET /solicitudes` (filtros `area`, `estado`, `prioridad`). Categoría y prioridad quedan `pendiente` hasta el clasificador de IA.
+
+```
+python -m pytest tests/api/ -q
+```
 
 ---
 
@@ -194,6 +214,10 @@ Tres archivos sobre `esquema.sql` (120 tickets; **otro dataset** que el CSV):
 | `sql/01_agregacion_por_area.sql` | Tickets, no cerrados y promedio de reaperturas por área y sede | 8 |
 | `sql/02_join_tres_tablas.sql` | Quién pidió qué, de qué área y sede | 120 |
 | `sql/03_tickets_reabiertos.sql` | Tickets que se reabrieron al menos una vez, con la fecha de la última reapertura si el log la tiene | 36 |
+
+### API propia (etapa 2)
+
+Tres recursos: crear (`POST /solicitudes`), consultar estado (`GET /solicitudes/{id}`), listar con filtros (`GET /solicitudes`). `GET /health` como el mock (sin token, `estado: operativo`). Validación Pydantic, códigos 201/200/401/404/409/422/503 y error uniforme `{ "error": { "codigo", "mensaje" } }`. Listado sin coincidencias: **200** `[]`, no 404. Categoría y prioridad quedan `origen_clasificacion=pendiente` hasta el ítem de IA.
 
 ---
 
@@ -225,6 +249,12 @@ Tres archivos sobre `esquema.sql` (120 tickets; **otro dataset** que el CSV):
 
 **SQL — índices.** El esquema no crea ninguno a propósito. Propuestos, no aplicados: `tickets(estado)`, `tickets(reaperturas)`, `historial_estado(estado_nuevo, fecha_cambio)`.
 
+**API — marco.** FastAPI + Pydantic (mismo estilo que el mock). Alternativa descartada: Flask a mano (más código para validar y para OpenAPI).
+
+**API — persistencia.** Memoria con candado. Alternativa descartada: SQLite ya (es diseño de datos de la etapa 4). Al reiniciar el proceso se pierde el listado.
+
+**API — secretos.** Bearer `API_TOKEN`, distinto de `MOCK_TOKEN`. Sin token configurado: 503, no un 401 ambiguo. `Idempotency-Key`: misma clave y mismo cuerpo → 200 y el mismo id; otro cuerpo → 409.
+
 ---
 
 ## Qué dejé fuera
@@ -237,4 +267,6 @@ Tres archivos sobre `esquema.sql` (120 tickets; **otro dataset** que el CSV):
 
 **Etapa 1 aún abierta.** Declaración de uso de IA de esta etapa, a mano, en `docs/declaracion_uso_ia.md`.
 
-**Etapas 2 a 5.** API propia, clasificador, legado, RAG, CI, orquestación, ADR, métricas y revisión del PR.
+**API (este ítem).** Clasificador de IA, legado y Angular. Contrato OpenAPI largo en `docs/api_contrato.md` (siguiente documentación). Persistencia.
+
+**Etapas 2 (resto) a 5.** Clasificador desacoplado, legado, RAG, CI, orquestación, ADR, métricas y revisión del PR.

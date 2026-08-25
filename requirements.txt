@@ -2,3 +2,5 @@ pandas
 pytest
 httpx
 pydantic
+fastapi
+uvicorn
