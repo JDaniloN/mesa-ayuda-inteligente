@@ -1,13 +1,8 @@
-"""Las pruebas no llaman a OpenAI ni dependen del `.env` de desarrollo.
-
-Se carga `.env` y luego se vacían las claves de IA. Así `override=True`
-no dispara llamadas reales durante pytest.
-"""
+"""Las pruebas nunca llaman a OpenAI ni dependen de secretos locales."""
 
 import os
 
-from src.entorno import cargar_entorno
-
-cargar_entorno()
+# El entorno del proceso prevalece sobre `.env` en Configuracion.
 os.environ["IA_API_KEY"] = ""
 os.environ["IA_API_BASE_URL"] = ""
+os.environ["APP_ENV"] = "test"

@@ -15,6 +15,10 @@ from src.ia.modelos import Clasificacion
 class ErrorProveedorIA(Exception):
     """Timeout, HTTP de error o JSON que no cumple el catálogo."""
 
+    def __init__(self, codigo: str) -> None:
+        self.codigo = codigo
+        super().__init__(codigo)
+
 
 class ProveedorHttp:
     def __init__(
@@ -59,8 +63,7 @@ class ProveedorHttp:
         except httpx.RequestError as exc:
             raise ErrorProveedorIA("conexion") from exc
         if respuesta.status_code >= 400:
-            detalle = (respuesta.text or "")[:200]
-            raise ErrorProveedorIA(f"http_{respuesta.status_code}: {detalle}")
+            raise ErrorProveedorIA(f"http_{respuesta.status_code}")
         try:
             data = respuesta.json()
             contenido = data["choices"][0]["message"]["content"]

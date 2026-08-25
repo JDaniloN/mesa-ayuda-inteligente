@@ -314,3 +314,62 @@ histórico. Cuento tickets con contador positivo, no sumo eventos.*
 Un contador vacío o corrupto no se transforma en `1`: confirma
 desconocimiento, no cero reaperturas. Inventarlo contaminaría indicadores
 posteriores.
+
+---
+
+## Configuración, logs y secretos (etapa 2)
+
+### ¿Por qué la variable del sistema gana sobre `.env`?
+
+`.env` es comodidad local. GitHub Actions, Docker o el servidor inyectan la
+configuración en el proceso y deben poder reemplazarla sin modificar archivos.
+Una variable vieja de PowerShell se elimina; no se invierte la precedencia de
+producción para ocultarla.
+
+**Cómo lo digo:** *El código es el mismo en todos los entornos. Solo cambia la
+configuración externa: proceso primero, archivo local después y valores seguros
+al final.*
+
+### ¿Por qué `pydantic-settings` y no varios `os.environ.get()`?
+
+Centraliza el contrato y valida tipos. Un `IA_TIMEOUT=cinco`, un puerto 70000
+o un nivel `VERBOSE` fallan al cargar con un mensaje identificable, en vez de
+romper una petición más tarde. `SecretStr` además oculta tokens en `repr`.
+
+### ¿Qué significa “log estructurado”?
+
+Cada línea es un objeto JSON con nombres estables: `event`, `request_id`,
+`method`, `path`, `status_code` y `duration_ms`. No es un `print` decorado:
+una plataforma puede filtrar todos los 500 o seguir una petición por su id.
+
+**Cómo lo digo:** *Un texto libre se lee; un JSON también se consulta. El
+`X-Request-ID` de la respuesta es el mismo que acompaña la petición y los
+intentos de IA.*
+
+### ¿Por qué stdout y no un archivo `.log`?
+
+Contenedores y plataformas recogen stdout, gestionan rotación y centralizan
+eventos. Escribir archivos dentro de la aplicación exige permisos, rotación y
+limpieza, y cada réplica tendría una copia distinta.
+
+### ¿Qué no se registra?
+
+No se serializan `Authorization`, `API_TOKEN`, `IA_API_KEY`, `MOCK_TOKEN`,
+prompt, respuesta del proveedor, asunto, descripción ni solicitante. Para
+diagnosticar IA basta `timeout`, `conexion`, `http_401` o `http_429`.
+
+Evidencia:
+
+```powershell
+python -m pytest tests/configuracion/ tests/observabilidad/ -q
+git check-ignore .env
+git ls-files .env
+```
+
+El primer comando de Git debe mostrar `.env`; el segundo no debe mostrar nada.
+
+El escaneo del código desarrollado excluye `materiales/`: el paquete original
+trae un patrón tipo `sk-proj-…` dentro de
+`materiales/revision/pr_para_revision.diff` como parte del PR defectuoso que
+se revisará al final. No es una clave copiada desde `.env`, no se utiliza y el
+material original no se modifica.

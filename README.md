@@ -69,6 +69,7 @@ El README de esta etapa cubre lo que pide el enunciado: **cómo instalar, cómo 
 | 2 | API propia (crear, estado, listar) | `src/api/` | `python -m pytest tests/api/` |
 | 2 | Clasificador IA (puerto + HTTP + degradado) | `src/ia/` | `python -m pytest tests/ia/` |
 | 2 | Correcciones S1–S3 del legado | `src/legacy/` y `docs/legacy_causas.md` | `python -m pytest tests/legacy/` |
+| 2 | Configuración tipada y logs JSON | `src/configuracion.py` y `src/observabilidad.py` | `python -m pytest tests/configuracion/ tests/observabilidad/` |
 | 2–5 | IA, RAG, orquestación, ADR | `src/`, `tests/`, `docs/`, `ci/` | Pendiente al cerrar cada etapa |
 | Todas | Paquete original (solo lectura) | `materiales/` | No se modifica |
 
@@ -78,6 +79,8 @@ Un solo producto. Las carpetas son por capacidad, no por número de etapa.
 
 ```
 src/
+  configuracion.py   contrato tipado de variables de entorno
+  observabilidad.py logs JSON y correlación por request_id
   datos/            limpieza, validación y resumen del CSV
   integraciones/    consumo del mock (GET/POST, errores, timeout)
   api/              recursos de la API propia (etapa 2)
@@ -108,7 +111,7 @@ Copy-Item .env.example .env
 
 Editar `.env`: `API_TOKEN` (Swagger), `MOCK_TOKEN` (mock) e `IA_API_KEY` (OpenAI, opcional). `.env.example` es el contrato para revisión; `.env` está en `.gitignore`.
 
-Dependencias: `pandas`, `pytest`, `httpx`, `pydantic`, `fastapi`, `uvicorn`, `python-dotenv`. SQLite viene con Python.
+Dependencias: `pandas`, `pytest`, `httpx`, `pydantic`, `pydantic-settings`, `fastapi`, `uvicorn`, `python-dotenv`. SQLite viene con Python.
 
 El mock es un proceso aparte y no se modifica:
 
@@ -167,7 +170,7 @@ Get-Content sql/01_agregacion_por_area.sql -Raw | mysql -u root -p -t mesa_ayuda
 **Pruebas**
 
 ```
-python -m pytest tests/datos/ tests/integraciones/ tests/sql/ tests/api/ tests/ia/ tests/legacy/ -q
+python -m pytest -q
 ```
 
 El enunciado pide **al menos tres funciones y un caso de borde**. Ya está cubierto: `normalizar_fecha`, `normalizar_categoria` y `eliminar_duplicados`, con bordes (fecha ilegible, archivo vacío o inexistente, `reaperturas` vacía). El mock añade timeout, 401, 404, 429, 500 y JSON roto. `tests/sql/` fija 8 / 120 / 36 y dos bordes del esquema feliz: un área sin tickets no desaparece; un reabierto sin paso en el log igual sale.
@@ -177,14 +180,14 @@ El mock real es aleatorio (~12 % de 500): el camino feliz en la terminal no bast
 **API propia (etapa 2, este ítem)**
 
 ```
-python -m uvicorn src.api.app:app --port 8000
+python -m src.api
 ```
 
-Lee `.env` al arrancar y **ese archivo gana** sobre un `$env:IA_API_KEY` viejo de la misma terminal. No hace falta pegar la clave en PowerShell.
+`API_HOST` y `API_PORT` salen de la configuración. La precedencia es sistema/GitHub/Docker → `.env` → valores predeterminados. Si PowerShell conserva una variable antigua, elimínela con `Remove-Item Env:NOMBRE`; el archivo local no debe pisar la configuración de un despliegue.
 
-OpenAPI: http://127.0.0.1:8000/docs — Bearer el `API_TOKEN` de `.env` (no la clave de OpenAI). `GET /health` (sin token) incluye `clasificador`: `proveedor` o `sin_clave`. Tres recursos: `POST /solicitudes`, `GET /solicitudes/{id}`, `GET /solicitudes`. La categoría/prioridad las asigna `src/ia/`. Si el LLM responde, `origen_clasificacion=proveedor`; si no hay clave, timeout, 401/429/500 o etiqueta fuera del catálogo → **201 igual**, `degradado` (`Sin clasificar` / `Media`). El 401 de OpenAI no es el 401 de la mesa.
+OpenAPI: http://127.0.0.1:8000/docs — Bearer el `API_TOKEN` de `.env` (no la clave de OpenAI). `GET /health` (sin token) incluye `clasificador`: `proveedor` o `sin_clave`. Cada respuesta devuelve `X-Request-ID` y cada petición deja un evento JSON en stdout con método, ruta, estado y latencia, sin cuerpo ni credenciales. Tres recursos: `POST /solicitudes`, `GET /solicitudes/{id}`, `GET /solicitudes`. La categoría/prioridad las asigna `src/ia/`. Si el LLM responde, `origen_clasificacion=proveedor`; si no hay clave, timeout, 401/429/500 o etiqueta fuera del catálogo → **201 igual**, `degradado` (`Sin clasificar` / `Media`). El 401 de OpenAI no es el 401 de la mesa.
 
-El camino feliz en Swagger no basta. Evidencia del degradado: `python -m pytest tests/ia/ tests/api/test_solicitudes.py -q`. En vivo: deje `IA_API_KEY=` vacío en `.env`, reinicie uvicorn, mismo POST.
+El camino feliz en Swagger no basta. Evidencia del degradado: `python -m pytest tests/ia/ tests/api/test_solicitudes.py -q`. En vivo: deje `IA_API_KEY=` vacío en `.env`, reinicie `python -m src.api` y repita el POST.
 
 ```
 python -m pytest tests/api/ tests/ia/ -q
@@ -219,6 +222,10 @@ Tres recursos: crear (`POST /solicitudes`), consultar estado (`GET /solicitudes/
 ### Módulo heredado (etapa 2)
 
 El original queda intacto en `materiales/legacy/legacy_module.py`. La copia de `src/legacy/` corrige únicamente los tres defectos reportados: incluye ambos extremos del período, evita compartir el acumulador entre llamadas y cuenta tickets reabiertos por el hecho histórico (`reaperturas > 0`), no por el estado actual. Las mismas regresiones fallaron con la copia original y pasan con las correcciones; causas y alternativas están en `docs/legacy_causas.md`.
+
+### Configuración y observabilidad (etapa 2)
+
+`src/configuracion.py` valida puertos, timeouts, reintentos, entorno y nivel de log; los tokens usan `SecretStr`. `.env` sirve para desarrollo y nunca se versiona; `.env.example` contiene solo el contrato. `src/observabilidad.py` emite JSON a stdout y limita los campos permitidos para no registrar `Authorization`, claves, asunto, descripción ni solicitante. El middleware correlaciona la respuesta y los eventos de IA mediante `X-Request-ID`.
 
 ---
 
@@ -266,6 +273,12 @@ El original queda intacto en `materiales/legacy/legacy_module.py`. La copia de `
 
 **IA — secretos y diagnóstico.** `IA_API_KEY` solo en `.env`; no va al repo ni al cuerpo de error. El Playground de OpenAI no usa esa clave: cuenta ok ≠ POST clasificado. `GET /health` dice si hay proveedor al arranque; el motivo del degradado sale en la terminal (`http_401`, `http_429`, `timeout`), sin imprimir el token. Alternativa descartada: `$env:` en cada sesión (se olvida, se pega en capturas y no sirve para revisar el PR).
 
+**Configuración — precedencia y validación.** El entorno del proceso gana sobre `.env`, como requieren GitHub Actions, Docker y un despliegue. `pydantic-settings` centraliza tipos y falla temprano ante un timeout negativo, un puerto inválido o un nivel de log desconocido. Alternativa descartada: mantener `os.environ.get()` disperso (cada módulo interpretaría de forma distinta el mismo valor).
+
+**Logs — stdout y campos permitidos.** Se usa `logging` estándar con JSON, sin crear archivos locales ni añadir otra biblioteca. El `request_id` permite seguir petición → IA → respuesta. Solo se serializan campos permitidos; el cuerpo del ticket, correo, tokens, prompt y respuesta del proveedor quedan fuera. Alternativa descartada: registrar el cuerpo completo para depurar (filtra datos personales y secretos).
+
+**Secretos — alcance del escaneo.** El código, las pruebas y la documentación desarrollados no contienen claves con formato `sk-proj-…`; `tests/seguridad/` lo fija. El paquete original incluye un patrón de ese tipo dentro de `materiales/revision/pr_para_revision.diff`, precisamente como artefacto defectuoso para la revisión final. No se usa, copia ni modifica.
+
 **Legado — corrección mínima.** No se reescribe ni se modifica el archivo entregado. S1 respeta el contrato inclusivo; S2 usa `None` sin eliminar el acumulador explícito; S3 cuenta tickets con contador positivo y no inventa `1` cuando falta el dato. Se descartó corregir S3 con `estado.lower()` porque solo arreglaría mayúsculas, no tickets que cambiaron de estado después de reabrirse.
 
 ---
@@ -284,4 +297,4 @@ El original queda intacto en `materiales/legacy/legacy_module.py`. La copia de `
 
 **IA.** No hay regex de categoría. No se versiona `IA_API_KEY`. No se usa Assistants ni streaming. Un modelo local o Groq caben cambiando `IA_API_BASE_URL`; no van en este entregable.
 
-**Etapa 2 (resto).** Angular y documentación técnica/funcional. Env/logs/secretos de la etapa siguen en `.env.example`.
+**Etapa 2 (resto).** Angular y documentación técnica/funcional.

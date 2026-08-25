@@ -7,14 +7,13 @@ orquestación de la etapa 4. El token sale de MOCK_TOKEN, no del código.
 
 from __future__ import annotations
 
-import os
 import time
 from typing import Optional
 
 import httpx
 from pydantic import ValidationError
 
-from src.entorno import cargar_entorno
+from src.configuracion import Configuracion
 from src.integraciones.errores import (
     ErrorAutorizacion,
     ErrorProveedor,
@@ -51,31 +50,31 @@ class ClienteMock:
         )
 
     @classmethod
-    def desde_entorno(cls) -> ClienteMock:
-        cargar_entorno()
-        token = os.environ.get("MOCK_TOKEN", "").strip()
+    def desde_configuracion(cls, configuracion: Configuracion) -> ClienteMock:
+        token = configuracion.mock_token.get_secret_value().strip()
         if not token:
             raise ErrorAutorizacion(
                 "Falta MOCK_TOKEN. Defínalo en el entorno; no se versiona."
             )
-        url = (
-            os.environ.get("MOCK_URL", "").strip()
-            or os.environ.get("MOCK_BASE_URL", "").strip()
-            or URL_POR_DEFECTO
+        url = configuracion.mock_url.strip() or URL_POR_DEFECTO
+        return cls(
+            base_url=url,
+            token=token,
+            timeout_s=configuracion.mock_timeout,
         )
-        crudo = os.environ.get("MOCK_TIMEOUT", "").strip()
-        if crudo:
-            try:
-                timeout_s = float(crudo)
-            except ValueError as exc:
+
+    @classmethod
+    def desde_entorno(cls) -> ClienteMock:
+        try:
+            config = Configuracion()
+        except ValidationError as exc:
+            campos = {str(error["loc"][0]) for error in exc.errors()}
+            if "mock_timeout" in campos:
                 raise ErrorValidacion(
-                    f"MOCK_TIMEOUT no es un número de segundos: {crudo!r}."
+                    "MOCK_TIMEOUT debe ser un número mayor que 0."
                 ) from exc
-            if timeout_s <= 0:
-                raise ErrorValidacion("MOCK_TIMEOUT debe ser mayor que 0.")
-        else:
-            timeout_s = TIMEOUT_S
-        return cls(base_url=url, token=token, timeout_s=timeout_s)
+            raise ErrorValidacion("La configuración del entorno no es válida.") from exc
+        return cls.desde_configuracion(config)
 
     def close(self) -> None:
         if self._propios:
