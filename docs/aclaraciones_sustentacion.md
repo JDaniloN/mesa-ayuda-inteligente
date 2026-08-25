@@ -201,13 +201,17 @@ Execute **no manda** la cabecera `authorization` (Swagger la trata como reservad
 
 ### ¿Dónde está el token?
 
-Solo en `MOCK_TOKEN`. No va en el repo. El valor de prueba está en `materiales/servicio_mock/README.md`.
+En `.env` como `MOCK_TOKEN` (el contrato está en `.env.example`). No va en el repo. El valor de prueba está en `materiales/servicio_mock/README.md`.
 
 ---
 
 ## API propia (etapa 2)
 
-OpenAPI: `http://127.0.0.1:8000/docs`. Token: `API_TOKEN` (no el del mock). Candado **Authorize**; el mock usaba un Header `authorization` y Execute no lo mandaba.
+OpenAPI: `http://127.0.0.1:8000/docs`. Token: `API_TOKEN` de `.env` (no el del mock ni la de OpenAI). Candado **Authorize**. Arranque: `python -m uvicorn src.api.app:app --port 8000` (sin `$env:`).
+
+### ¿Por qué `.env` y no variables en la terminal?
+
+El evaluador ve `.env.example` (contrato, sin secretos). `.env` no se sube. Pegar `$env:IA_API_KEY` en cada sesión acaba en capturas. Al arrancar, el archivo pisa un `$env:` viejo de la misma terminal.
 
 ### ¿Por qué el listado vacío es 200 y no 404?
 
@@ -215,7 +219,7 @@ OpenAPI: `http://127.0.0.1:8000/docs`. Token: `API_TOKEN` (no el del mock). Cand
 
 **Cómo lo digo:** *404 es “esta solicitud no existe”. 200 vacío es “no hay ninguna que cumpla el filtro”. Si el listado devolviera 404, el tablero vacío se confundiría con una ruta rota.*
 
-Vacaciones es categoría, no área. Hasta el clasificador, la prioridad stub es Media: filtrar `prioridad=Alta` también da `[]`.
+Vacaciones es categoría, no área. Filtrar `prioridad=Alta` da `[]` si el LLM no asignó Alta (el degradado deja Media).
 
 ### ¿Por qué FastAPI y no Flask?
 
@@ -231,4 +235,39 @@ Sin secreto configurado el servicio no está listo. Un 401 haría pensar que el 
 
 ### `/health`
 
-Como el mock: sin token, `estado: operativo`. No usa etiqueta `salud`.
+Como el mock: sin token, `estado: operativo`. No usa etiqueta `salud`. Extra: `clasificador` (`proveedor` si al arranque había URL y clave, `sin_clave` si no). No prueba que OpenAI tenga saldo: eso se ve en la terminal al clasificar (`http_429`).
+
+---
+
+## Clasificador de IA (etapa 2)
+
+La API no habla con OpenAI: llama `clasificar`. El HTTP vive en `src/ia/proveedor_http.py`. Pruebas sin red: `python -m pytest tests/ia/ -q`.
+
+### ¿Por qué el POST sigue en 201 si OpenAI falla?
+
+El enunciado pide modo degradado, no “el ticket espera al LLM”. Un 502 dejaría al colaborador sin solicitud. Se crea igual, con `Sin clasificar` / `Media` y `origen_clasificacion=degradado`.
+
+**Cómo lo digo:** *El 401 o el 429 son de OpenAI. El 201 es de la mesa. Si mezclo esos códigos, el Authorize de Swagger parece roto cuando lo que falló fue la cuota.*
+
+Evidencia: `test_post_201_si_el_llm_responde_500`. En vivo: quite `IA_API_KEY`, reinicie, mismo POST.
+
+### ¿Por qué no un regex de “vacaciones” / “urgente”?
+
+Se evaluó **después** de ver el LLM. El camino principal ya etiqueta Vacaciones/Crítica. Un texto ambiguo (calendario + módulo) el propio modelo deja en `Sin clasificar` con `origen=proveedor`: no es un fallo, es abstención. El regex copiaría el catálogo de la limpieza, acertaría el caso feliz y mentiría en otros. El degradado sin regex dice la verdad: *no clasificamos, el ticket existe*.
+
+### ¿Por qué timeout 8 s y un reintento?
+
+El mock mide 2,5 s de latencia → 5 s. Un chat puede tardar más en el primer token; 8 s no confunde “lento” con “caído”. Un reintento cubre 500/timeout; el 401 también se reintenta (una llamada de más) para no ramificar. Alternativa descartada: reintentos infinitos o backoff largo (el POST de la mesa se quedaría colgado).
+
+### ¿401, 429 y degradado son lo mismo?
+
+No.
+
+| Qué ves | Quién falló |
+|---|---|
+| POST `/solicitudes` **401** | Bearer de la **mesa** (`API_TOKEN` / Authorize) |
+| Terminal `http_401` y POST **201** degradado | Clave de **OpenAI** inválida |
+| Terminal `http_429` y POST **201** degradado | Cuota o tope de gasto de OpenAI (Billing y Limits; el Playground no usa tu `sk-proj`) |
+| `origen=proveedor` | El LLM contestó y la etiqueta está en el catálogo |
+
+`GET /health` → `clasificador: proveedor` solo dice que había URL y clave **al arrancar**, no que haya saldo.

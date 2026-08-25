@@ -26,14 +26,14 @@ Un solo README raíz, como pide el enunciado: hasta qué etapa llegué y dónde 
 | Etapa | Documento | Estado |
 |---|---|---|
 | 0–1 | `docs/declaracion_uso_ia.md` | Etapa 0 llena a mano; etapa 1 pendiente |
-| 1 | `docs/aclaraciones_sustentacion.md` | Hecho (SQL, mock, preguntas fijas) |
+| 1–2 | `docs/aclaraciones_sustentacion.md` | Hecho (SQL, mock, API, clasificador IA) |
 | 2 | Contrato de la API + doc funcional (qué resuelve y para quién) | Pendiente |
 | 3 | Guía breve de prompts, commits o revisión de código generado por IA | Pendiente |
 | 4 | Arquitectura, flujo extremo a extremo y tres ADR | Pendiente |
 | 5 | Decisión IA vs automatización, métricas previas, revisión del PR | Pendiente |
 | Entrega | Video de 5 min y revisión escrita de `pr_para_revision.diff` | Pendiente |
 
-**Lectura corta para el evaluador.** Instalar y ejecutar están abajo. El criterio (alternativas descartadas, 36 vs 28, timeout 5 s) está en *Qué supuse* y en `docs/aclaraciones_sustentacion.md`. El código de esta etapa: `src/datos/limpiar.py`, `src/integraciones/`, `sql/`.
+**Lectura corta para el evaluador.** Instalar y ejecutar están abajo. El criterio (alternativas descartadas, 36 vs 28, timeout 5 s, degradado sin regex) está en *Qué supuse* y en `docs/aclaraciones_sustentacion.md`. El código de esta etapa: `src/datos/limpiar.py`, `src/integraciones/`, `sql/`.
 
 ## Hasta qué etapa llegué
 
@@ -43,7 +43,7 @@ Etapa 0 hecha. Etapa 1: CSV, mock y SQL cerrados. Falta llenar a mano la declara
 |---|---|---|
 | Hecha | 0. Contextualización | Enunciado, materiales y alcance Middle II |
 | En curso | 1. Fundamentos | Limpieza del CSV, cliente del mock y tres consultas SQL |
-| En curso | 2. Autonomía e integración | API propia (tres recursos). Faltan IA, legado y Angular |
+| En curso | 2. Autonomía e integración | API propia e IA. Faltan legado y Angular |
 | Pendiente | 3. Complejidad y calidad | RAG, abstención, CI, seguridad |
 | Pendiente | 4. Arquitectura y orquestación | Diseño, ADR y demo mínima |
 | Pendiente | 5. Estrategia y evaluación | Decisión, métricas previas, ML clásico |
@@ -67,6 +67,7 @@ El README de esta etapa cubre lo que pide el enunciado: **cómo instalar, cómo 
 | 1 | Pruebas de integraciones | `tests/integraciones/` | `python -m pytest tests/integraciones/` |
 | 1 | Pruebas de las consultas SQL | `tests/sql/` | `python -m pytest tests/sql/` |
 | 2 | API propia (crear, estado, listar) | `src/api/` | `python -m pytest tests/api/` |
+| 2 | Clasificador IA (puerto + HTTP + degradado) | `src/ia/` | `python -m pytest tests/ia/` |
 | 2–5 | IA, RAG, orquestación, ADR | `src/`, `tests/`, `docs/`, `ci/` | Pendiente al cerrar cada etapa |
 | Todas | Paquete original (solo lectura) | `materiales/` | No se modifica |
 
@@ -94,33 +95,24 @@ data/salida/        CSV locales; no se versionan
 
 ## Cómo instalar
 
-Python 3 con `pip`. Desde la raíz del repositorio:
+Python 3. Entorno virtual y variables en `.env` (no se pegan secretos en la terminal ni se versionan).
 
 ```
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-Dependencias de esta etapa: `pandas`, `pytest`, `httpx`, `pydantic`, `fastapi`, `uvicorn`. SQLite viene con Python; no hay que instalar un motor SQL para comprobar las consultas.
+Editar `.env`: `API_TOKEN` (Swagger), `MOCK_TOKEN` (mock) e `IA_API_KEY` (OpenAI, opcional). `.env.example` es el contrato para revisión; `.env` está en `.gitignore`.
 
-El mock es un proceso aparte y no se modifica. Sus dependencias:
+Dependencias: `pandas`, `pytest`, `httpx`, `pydantic`, `fastapi`, `uvicorn`, `python-dotenv`. SQLite viene con Python.
+
+El mock es un proceso aparte y no se modifica:
 
 ```
 cd materiales/servicio_mock
 pip install -r requirements.txt
-```
-
-El token no va en el repo. El valor de prueba está en `materiales/servicio_mock/README.md`. En PowerShell, solo en la sesión:
-
-```
-$env:MOCK_TOKEN="demo-token-prueba-2026"
-```
-
-Opcional: `$env:MOCK_URL` (por defecto `http://localhost:8080`) y `$env:MOCK_TIMEOUT` (por defecto 5 segundos).
-
-Token de la API propia (no es el del mock). En PowerShell:
-
-```
-$env:API_TOKEN="demo-api-local"
 ```
 
 ---
@@ -146,7 +138,7 @@ cd materiales/servicio_mock
 uvicorn app:app --port 8080
 ```
 
-En otra, con `MOCK_TOKEN` ya definido:
+En otra (`.env` ya con `MOCK_TOKEN`):
 
 ```
 python -m src.integraciones.cliente
@@ -173,7 +165,7 @@ Get-Content sql/01_agregacion_por_area.sql -Raw | mysql -u root -p -t mesa_ayuda
 **Pruebas**
 
 ```
-python -m pytest tests/datos/ tests/integraciones/ tests/sql/ tests/api/ -q
+python -m pytest tests/datos/ tests/integraciones/ tests/sql/ tests/api/ tests/ia/ -q
 ```
 
 El enunciado pide **al menos tres funciones y un caso de borde**. Ya está cubierto: `normalizar_fecha`, `normalizar_categoria` y `eliminar_duplicados`, con bordes (fecha ilegible, archivo vacío o inexistente, `reaperturas` vacía). El mock añade timeout, 401, 404, 429, 500 y JSON roto. `tests/sql/` fija 8 / 120 / 36 y dos bordes del esquema feliz: un área sin tickets no desaparece; un reabierto sin paso en el log igual sale.
@@ -183,14 +175,17 @@ El mock real es aleatorio (~12 % de 500): el camino feliz en la terminal no bast
 **API propia (etapa 2, este ítem)**
 
 ```
-$env:API_TOKEN="demo-api-local"
 python -m uvicorn src.api.app:app --port 8000
 ```
 
-OpenAPI: http://127.0.0.1:8000/docs — Bearer `API_TOKEN`. Tres recursos: `POST /solicitudes`, `GET /solicitudes/{id}`, `GET /solicitudes` (filtros `area`, `estado`, `prioridad`). Categoría y prioridad quedan `pendiente` hasta el clasificador de IA.
+Lee `.env` al arrancar y **ese archivo gana** sobre un `$env:IA_API_KEY` viejo de la misma terminal. No hace falta pegar la clave en PowerShell.
+
+OpenAPI: http://127.0.0.1:8000/docs — Bearer el `API_TOKEN` de `.env` (no la clave de OpenAI). `GET /health` (sin token) incluye `clasificador`: `proveedor` o `sin_clave`. Tres recursos: `POST /solicitudes`, `GET /solicitudes/{id}`, `GET /solicitudes`. La categoría/prioridad las asigna `src/ia/`. Si el LLM responde, `origen_clasificacion=proveedor`; si no hay clave, timeout, 401/429/500 o etiqueta fuera del catálogo → **201 igual**, `degradado` (`Sin clasificar` / `Media`). El 401 de OpenAI no es el 401 de la mesa.
+
+El camino feliz en Swagger no basta. Evidencia del degradado: `python -m pytest tests/ia/ tests/api/test_solicitudes.py -q`. En vivo: deje `IA_API_KEY=` vacío en `.env`, reinicie uvicorn, mismo POST.
 
 ```
-python -m pytest tests/api/ -q
+python -m pytest tests/api/ tests/ia/ -q
 ```
 
 ---
@@ -217,7 +212,7 @@ Tres archivos sobre `esquema.sql` (120 tickets; **otro dataset** que el CSV):
 
 ### API propia (etapa 2)
 
-Tres recursos: crear (`POST /solicitudes`), consultar estado (`GET /solicitudes/{id}`), listar con filtros (`GET /solicitudes`). `GET /health` como el mock (sin token, `estado: operativo`). Validación Pydantic, códigos 201/200/401/404/409/422/503 y error uniforme `{ "error": { "codigo", "mensaje" } }`. Listado sin coincidencias: **200** `[]`, no 404. Categoría y prioridad quedan `origen_clasificacion=pendiente` hasta el ítem de IA.
+Tres recursos: crear (`POST /solicitudes`), consultar estado (`GET /solicitudes/{id}`), listar con filtros (`GET /solicitudes`). `GET /health` como el mock (sin token, `estado: operativo`) más `clasificador` (`proveedor` / `sin_clave`) para no confundir “servicio arriba” con “LLM configurado”. Validación Pydantic, códigos 201/200/401/404/409/422/503 y error uniforme `{ "error": { "codigo", "mensaje" } }`. Listado sin coincidencias: **200** `[]`, no 404. Clasificación: LLM (catálogo cerrado de la limpieza) o degradado `Sin clasificar`/`Media` si el proveedor falla; el POST no pasa a 500.
 
 ---
 
@@ -253,7 +248,17 @@ Tres recursos: crear (`POST /solicitudes`), consultar estado (`GET /solicitudes/
 
 **API — persistencia.** Memoria con candado. Alternativa descartada: SQLite ya (es diseño de datos de la etapa 4). Al reiniciar el proceso se pierde el listado.
 
-**API — secretos.** Bearer `API_TOKEN`, distinto de `MOCK_TOKEN`. Sin token configurado: 503, no un 401 ambiguo. `Idempotency-Key`: misma clave y mismo cuerpo → 200 y el mismo id; otro cuerpo → 409.
+**API — secretos.** Bearer `API_TOKEN`, distinto de `MOCK_TOKEN`. Viven en `.env` (no en el repo; el contrato es `.env.example`). Sin token configurado: 503, no un 401 ambiguo. `Idempotency-Key`: misma clave y mismo cuerpo → 200 y el mismo id; otro cuerpo → 409.
+
+**IA — desacople.** La API llama `clasificar` (`PuertoClasificador`), no a OpenAI. Así se inyecta un fijo en pruebas y mañana se cambia de proveedor sin tocar `src/api/`. Alternativa descartada: pegar `httpx` en la ruta del POST.
+
+**IA — contrato HTTP.** `/v1/chat/completions` (OpenAI y compatibles: Groq, modelo local). Timeout **8 s** (el mock eran 5 s: latencia máxima 2,5 s; un chat tarda más en el primer token). Un reintento ante cualquier fallo del proveedor; si el segundo también falla → degradado. Alternativa descartada: reintentar solo 429 (un 500 transitorio también merece un segundo tiro; un 401 se gasta una llamada de más, se acepta por no ramificar).
+
+**IA — catálogo cerrado.** Las etiquetas salen de `CATEGORIAS_VALIDAS` / `PRIORIDADES_VALIDAS` de la limpieza. Si el modelo inventa una, no se guarda: degradado. Alternativa descartada: fiarse del JSON del LLM (rompe el resumen área × prioridad).
+
+**IA — degradado, no regex.** Si no hay clave, timeout, 401, 429, 500, JSON roto o etiqueta fuera de catálogo: `Sin clasificar` / `Media` y `origen=degradado`. El ticket **sí se crea** (201). Tras ver el LLM en vivo (vacaciones urgentes → Vacaciones/Crítica; texto ambiguo → el propio modelo elige Sin clasificar), el regex de negocio **sigue fuera**: duplicaría el catálogo, falsearía “vacaciones” en un correo de software, y el `origen` dejaría de decir la verdad. Alternativa descartada: 502 si OpenAI falla (el colaborador se queda sin solicitud).
+
+**IA — secretos y diagnóstico.** `IA_API_KEY` solo en `.env`; no va al repo ni al cuerpo de error. El Playground de OpenAI no usa esa clave: cuenta ok ≠ POST clasificado. `GET /health` dice si hay proveedor al arranque; el motivo del degradado sale en la terminal (`http_401`, `http_429`, `timeout`), sin imprimir el token. Alternativa descartada: `$env:` en cada sesión (se olvida, se pega en capturas y no sirve para revisar el PR).
 
 ---
 
@@ -267,6 +272,8 @@ Tres recursos: crear (`POST /solicitudes`), consultar estado (`GET /solicitudes/
 
 **Etapa 1 aún abierta.** Declaración de uso de IA de esta etapa, a mano, en `docs/declaracion_uso_ia.md`.
 
-**API (este ítem).** Clasificador de IA, legado y Angular. Contrato OpenAPI largo en `docs/api_contrato.md` (siguiente documentación). Persistencia.
+**API (cerrada en este ítem).** Contrato OpenAPI largo en `docs/api_contrato.md` (siguiente documentación). Persistencia.
 
-**Etapas 2 (resto) a 5.** Clasificador desacoplado, legado, RAG, CI, orquestación, ADR, métricas y revisión del PR.
+**IA.** No hay regex de categoría. No se versiona `IA_API_KEY`. No se usa Assistants ni streaming. Un modelo local o Groq caben cambiando `IA_API_BASE_URL`; no van en este entregable.
+
+**Etapa 2 (resto).** Legado S1–S3 y Angular. Env/logs/secretos de la etapa siguen en `.env.example`.

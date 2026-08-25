@@ -14,6 +14,7 @@ from typing import Optional
 import httpx
 from pydantic import ValidationError
 
+from src.entorno import cargar_entorno
 from src.integraciones.errores import (
     ErrorAutorizacion,
     ErrorProveedor,
@@ -51,12 +52,17 @@ class ClienteMock:
 
     @classmethod
     def desde_entorno(cls) -> ClienteMock:
+        cargar_entorno()
         token = os.environ.get("MOCK_TOKEN", "").strip()
         if not token:
             raise ErrorAutorizacion(
                 "Falta MOCK_TOKEN. Defínalo en el entorno; no se versiona."
             )
-        url = os.environ.get("MOCK_URL", URL_POR_DEFECTO).strip() or URL_POR_DEFECTO
+        url = (
+            os.environ.get("MOCK_URL", "").strip()
+            or os.environ.get("MOCK_BASE_URL", "").strip()
+            or URL_POR_DEFECTO
+        )
         crudo = os.environ.get("MOCK_TIMEOUT", "").strip()
         if crudo:
             try:

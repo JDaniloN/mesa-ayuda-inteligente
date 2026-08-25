@@ -7,13 +7,13 @@ from typing import Optional
 from uuid import uuid4
 
 from src.api.modelos import SolicitudEntrada, SolicitudSalida, ahora_iso
+from src.ia.modelos import Clasificacion
 
-# Stub hasta el clasificador desacoplado. No inventa categoría de negocio.
-CLASIFICACION_PENDIENTE = {
-    "categoria": "Sin clasificar",
-    "prioridad": "Media",
-    "origen_clasificacion": "pendiente",
-}
+DEGRADADO = Clasificacion(
+    categoria="Sin clasificar",
+    prioridad="Media",
+    origen="degradado",
+)
 
 
 class Repositorio:
@@ -26,8 +26,10 @@ class Repositorio:
         self,
         entrada: SolicitudEntrada,
         clave_idempotencia: Optional[str] = None,
+        clasificacion: Optional[Clasificacion] = None,
     ) -> tuple[SolicitudSalida, bool]:
         """Devuelve (solicitud, es_nueva). Misma clave y mismo cuerpo reusa."""
+        clase = clasificacion or DEGRADADO
         with self._lock:
             if clave_idempotencia:
                 existente_id = self._idempotencia.get(clave_idempotencia)
@@ -48,7 +50,9 @@ class Repositorio:
                 canal=entrada.canal,
                 estado="Abierto",
                 fecha_creacion=ahora_iso(),
-                **CLASIFICACION_PENDIENTE,
+                categoria=clase.categoria,
+                prioridad=clase.prioridad,
+                origen_clasificacion=clase.origen,
             )
             self._por_id[ident] = salida
             if clave_idempotencia:

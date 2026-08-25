@@ -24,8 +24,10 @@ def crear(
     idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
 ):
     clave = (idempotency_key or "").strip() or None
+    texto = f"{entrada.asunto}\n{entrada.descripcion}".strip()
+    clasificacion = request.app.state.clasificador.clasificar(texto)
     try:
-        salida, nueva = _repo(request).crear(entrada, clave)
+        salida, nueva = _repo(request).crear(entrada, clave, clasificacion)
     except ClaveIdempotenciaEnUso as exc:
         raise HTTPException(status_code=409, detail=cuerpo("conflicto", str(exc))) from exc
     response.status_code = 201 if nueva else 200

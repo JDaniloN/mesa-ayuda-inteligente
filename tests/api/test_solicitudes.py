@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from src.api.app import create_app
 from src.api.repositorio import Repositorio
+from src.ia.fachada import FachadaClasificador
 
 TOKEN = "test-token"
 CUERPO = {
@@ -13,13 +14,20 @@ CUERPO = {
 
 
 def _cliente() -> TestClient:
-    return TestClient(create_app(repositorio=Repositorio(), api_token=TOKEN))
+    return TestClient(
+        create_app(
+            repositorio=Repositorio(),
+            api_token=TOKEN,
+            clasificador=FachadaClasificador(proveedor=None),
+        )
+    )
 
 
 def test_health_no_pide_token():
     r = _cliente().get("/health")
     assert r.status_code == 200
     assert r.json()["estado"] == "operativo"
+    assert r.json()["clasificador"] == "sin_clave"
 
 
 def test_health_aparece_en_openapi():
@@ -60,7 +68,7 @@ def test_crear_201_y_consultar_estado():
     assert creada.status_code == 201
     cuerpo = creada.json()
     assert cuerpo["estado"] == "Abierto"
-    assert cuerpo["origen_clasificacion"] == "pendiente"
+    assert cuerpo["origen_clasificacion"] == "degradado"
     assert cuerpo["id"].startswith("SOL-")
 
     una = c.get(
@@ -151,3 +159,72 @@ def test_idempotencia_misma_clave_otro_cuerpo_es_409():
     )
     assert r.status_code == 409
     assert r.json()["error"]["codigo"] == "conflicto"
+
+
+def test_post_201_si_el_llm_responde_500():
+    """El 500 es del proveedor de IA, no de la mesa: el ticket se crea."""
+    import httpx
+
+    from src.ia.fachada import FachadaClasificador
+    from src.ia.proveedor_http import ProveedorHttp
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "boom"})
+
+    clasificador = FachadaClasificador(
+        proveedor=ProveedorHttp(
+            base_url="http://ia.test/v1",
+            api_key="sk-test",
+            modelo="demo",
+            timeout_s=2.0,
+            http=httpx.Client(
+                transport=httpx.MockTransport(handler),
+                base_url="http://ia.test",
+            ),
+        ),
+        reintentos=0,
+    )
+    c = TestClient(
+        create_app(
+            repositorio=Repositorio(),
+            api_token=TOKEN,
+            clasificador=clasificador,
+        )
+    )
+    r = c.post(
+        "/solicitudes",
+        json=CUERPO,
+        headers={"Authorization": f"Bearer {TOKEN}"},
+    )
+    assert r.status_code == 201
+    assert r.json()["origen_clasificacion"] == "degradado"
+    assert r.json()["categoria"] == "Sin clasificar"
+
+
+def test_post_usa_clasificador_del_puerto():
+    from src.ia.modelos import Clasificacion
+
+    class Fijo:
+        def clasificar(self, texto: str) -> Clasificacion:
+            assert "vacaciones" in texto.lower()
+            return Clasificacion("Vacaciones", "Alta", "proveedor")
+
+    c = TestClient(
+        create_app(
+            repositorio=Repositorio(),
+            api_token=TOKEN,
+            clasificador=Fijo(),
+        )
+    )
+    r = c.post(
+        "/solicitudes",
+        json={
+            **CUERPO,
+            "asunto": "Solicito vacaciones de diciembre",
+        },
+        headers={"Authorization": f"Bearer {TOKEN}"},
+    )
+    assert r.status_code == 201
+    assert r.json()["categoria"] == "Vacaciones"
+    assert r.json()["prioridad"] == "Alta"
+    assert r.json()["origen_clasificacion"] == "proveedor"
