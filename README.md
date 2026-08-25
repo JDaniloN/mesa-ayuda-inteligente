@@ -14,14 +14,15 @@ no abren otro.
 ## Cómo leer este repositorio
 
 1. [Estado](#estado) — hasta dónde llegó la entrega.
-2. [Preparación](#preparación-una-sola-vez) — entorno, `.env` y mock.
-3. [Etapa 0](#etapa-0--contextualización) — contextualización.
-4. [Etapa 1](#etapa-1--fundamentos) — CSV, mock, SQL y pruebas.
-5. [Etapa 2](#etapa-2--autonomía-e-integración) — API, IA, legado, config, Angular.
-6. [Etapa 3](#etapa-3--complejidad-y-calidad) — RAG, abstención, CI, seguridad, métricas y artefacto.
-7. [Etapa 4](#etapa-4--arquitectura-y-orquestación) — arquitectura y ADR hechos; demo/webhook pendientes.
-8. [Etapa 5](#etapa-5--estrategia-y-evaluación) — plan fase 1; entregables finales pendientes.
-9. [Mapa del código](#mapa-del-código)
+2. [Guion del video](#guion-del-video-5-minutos) — checklist de grabación (demo real).
+3. [Preparación](#preparación-una-sola-vez) — entorno, `.env` y mock.
+4. [Etapa 0](#etapa-0--contextualización) — contextualización.
+5. [Etapa 1](#etapa-1--fundamentos) — CSV, mock, SQL y pruebas.
+6. [Etapa 2](#etapa-2--autonomía-e-integración) — API, IA, legado, config, Angular.
+7. [Etapa 3](#etapa-3--complejidad-y-calidad) — RAG, abstención, CI, seguridad, métricas y artefacto.
+8. [Etapa 4](#etapa-4--arquitectura-y-orquestación) — arquitectura y ADR hechos; demo/webhook pendientes.
+9. [Etapa 5](#etapa-5--estrategia-y-evaluación) — plan fase 1; entregables finales pendientes.
+10. [Mapa del código](#mapa-del-código)
 
 `materiales/` es el paquete original. No se modifica.
 
@@ -65,6 +66,112 @@ nuevos de esas etapas.
 
 ---
 
+## Guion del video (5 minutos)
+
+Este bloque es el recorrido de grabación. Solo muestra lo **implementado**
+(etapas 0–3) y, al final, el **diseño** de la etapa 4. No invente demo de
+orquestación/webhook ni entregables de la etapa 5: el README ya los marca
+pendientes.
+
+### Antes de pulsar grabar
+
+```
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+python -m src.rag
+python -m src.api
+```
+
+En otra terminal (solo si muestra el mock de la etapa 1):
+
+```
+cd materiales/servicio_mock
+uvicorn app:app --port 8080
+```
+
+Comprobar:
+
+| Chequeo | Esperado |
+|---|---|
+| http://127.0.0.1:8000/docs | Swagger de la API propia |
+| Authorize | Bearer = `API_TOKEN` de `.env` (no la clave OpenAI) |
+| `GET /health` | `estado: operativo` y `clasificador: proveedor` (con `IA_API_KEY`) |
+| Índice RAG | Ya corrido `python -m src.rag` (si no, `/politicas/consultar` → 503) |
+
+### Minuto a minuto (seguir en orden)
+
+| Min | Qué decir / mostrar | Dónde | Resultado que debe verse |
+|---|---|---|---|
+| 0:00 | Qué es el repo, nivel Middle II, **hasta etapa 3 hecha**; etapa 4 en diseño; etapa 5 en plan | Este README → [Estado](#estado) | Tabla de estado sin contradicciones |
+| 0:30 | Alta de solicitud con IA | Swagger `POST /solicitudes` + cuerpo del [ítem API](#api-propia) | **201**, `SOL-…`, categoría/prioridad, `origen_clasificacion` |
+| 1:00 | Idempotencia | Mismo POST + misma cabecera `Idempotency-Key` (en Swagger: Parameters) | **200**, mismo id, sin segunda llamada “visible” |
+| 1:20 | RAG de dos hechos (hero) | `POST /politicas/consultar` con la pregunta de **cierre y reapertura** abajo | Texto con **2 días hábiles** (cierre) y **5 días hábiles** (reabrir); citas `POL-TIC-05` §7 y §6.1 |
+| 2:10 | Abstención sin inventar | Misma ruta, pregunta Japón | Mensaje fijo + `citas: []` |
+| 2:40 | Calidad local | Terminal: `ruff check --select E9,F63,F7,F82 src tests` y `python -m pytest -q` | Ruff OK; **199 passed** |
+| 3:10 | CI verde/rojo | `docs/evidencia_ci.md` + links de Actions | Diseño del pipeline; camino rojo con `demostrar_fallo` |
+| 3:40 | Seguridad + métricas | Abrir `docs/informe_seguridad_ia.md`; Swagger `GET /metricas/resumen` | Cuatro hallazgos corregidos; agregados sin prompts |
+| 4:10 | Etapa 4 (solo diseño) | `docs/arquitectura.md` + un ADR | Flujos etiquetados Implementado vs Diseño; **sin** correr `src/orquestacion` (solo stub) |
+| 4:40 | Cierre honesto | Residuales | Umbral RAG sin gold set; demo/webhook etapa 4 y entregables etapa 5 **pendientes**; video + PC-GTH-68 al cerrar entrega |
+
+### Cuerpos listos para pegar en Swagger
+
+`POST /solicitudes` (Authorize previo):
+
+```json
+{
+  "asunto": "No puedo ingresar al correo corporativo",
+  "descripcion": "El acceso falla desde esta mañana.",
+  "area": "Aplicaciones",
+  "solicitante": "persona@lafortuna.com.co",
+  "canal": "api"
+}
+```
+
+`POST /politicas/consultar` — hero (cierre + reapertura):
+
+```json
+{
+  "pregunta": "Tras solucionarse un incidente en la mesa de ayuda, ¿cuánto tiempo tiene el sistema para cerrarlo automáticamente si el usuario no responde, y cuánto tiempo tiene el usuario para reabrirlo si la falla vuelve a presentarse?",
+  "limite": 4
+}
+```
+
+`POST /politicas/consultar` — abstención:
+
+```json
+{
+  "pregunta": "¿Cuál es la capital de Japón?",
+  "limite": 4
+}
+```
+
+Mensaje fijo de abstención (debe coincidir carácter a carácter):
+
+```
+No encontré información suficiente en las políticas proporcionadas para responder la pregunta.
+```
+
+Opcional si sobra tiempo: pregunta de **problema vs crítico** (citas §6.3 y §5.1):
+
+```json
+{
+  "pregunta": "Si un ticket se reabre tres veces, ¿en qué se convierte y qué ocurre si un incidente es clasificado como crítico?",
+  "limite": 4
+}
+```
+
+### Qué no grabar como “ya hecho”
+
+- `python -m src.orquestacion` / `tests/orquestacion/` — pendientes (paquete vacío).
+- Webhook `/webhook/mensajeria` con backoff — pendiente etapa 4.
+- `docs/decision_ia_vs_automatizacion.md`, gold ≥50, suite `tests/evaluacion/`, notebook ML — pendientes etapa 5.
+- Angular (`http://localhost:4200`) — opcional; no bloquea el guion.
+
+El detalle de cada comando está en las secciones de etapa más abajo; este
+guion solo fija el orden y el resultado esperado en cámara.
+
+---
+
 ## Preparación (una sola vez)
 
 Python 3. Entorno virtual y variables en `.env` (no se pegan secretos en la
@@ -74,10 +181,12 @@ uvicorn del mock.
 ```
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 Copy-Item .env.example .env
 ```
 
+`requirements-dev.txt` incluye `requirements.txt` más Ruff (necesario para el
+paso de calidad del video y del CI).
 Editar `.env`:
 
 | Variable | Para qué | Dónde se usa |
@@ -573,7 +682,7 @@ de la etapa 2 en `docs/declaracion_uso_ia.md` está completa.
 ## Etapa 3 — Complejidad y calidad
 
 **Estado:** implementación hecha. Los seis ítems de abajo están cerrados;
-el residual del umbral RAG y los tres `xfail` quedan declarados al final.
+el residual del umbral RAG (sin gold set) queda declarado al final.
 
 ### RAG de políticas internas (este ítem)
 
@@ -609,10 +718,15 @@ python -m src.api
 python -m pytest tests/rag/ tests/api/test_politicas.py tests/api/test_contrato_openapi.py -q
 ```
 
-En Swagger, `POST /politicas/consultar` con Bearer. Ejemplos:
+En Swagger (`http://127.0.0.1:8000/docs`), `POST /politicas/consultar` con
+Bearer. Usar los cuerpos del [guion del video](#guion-del-video-5-minutos).
+Ejemplos mínimos:
 
 ```json
-{ "pregunta": "¿Cuál es el tiempo de respuesta de un incidente crítico?", "limite": 4 }
+{
+  "pregunta": "Tras solucionarse un incidente en la mesa de ayuda, ¿cuánto tiempo tiene el sistema para cerrarlo automáticamente si el usuario no responde, y cuánto tiempo tiene el usuario para reabrirlo si la falla vuelve a presentarse?",
+  "limite": 4
+}
 ```
 
 ```json
@@ -620,8 +734,9 @@ En Swagger, `POST /politicas/consultar` con Bearer. Ejemplos:
 ```
 
 **Qué resultados aparecen.** La ingesta imprime documentos, fragmentos y
-modelo. Una pregunta de contrato (vacaciones, incidentes) responde con citas
-verificables. La pregunta fuera de dominio devuelve:
+modelo. La pregunta de cierre/reapertura responde con plazos (**2** y **5**
+días hábiles) y citas `POL-TIC-05` §7 y §6.1. La pregunta fuera de dominio
+devuelve:
 
 ```
 No encontré información suficiente en las políticas proporcionadas para responder la pregunta.
@@ -630,13 +745,10 @@ No encontré información suficiente en las políticas proporcionadas para respo
 y `citas: []`.
 
 **Qué quedó pendiente de este ítem.** No se sustituye Chroma, no hay reranker
-LLM y `RAG_MIN_SCORE` no está calibrado con un gold set. Tres regresiones en
-`tests/rag/test_consultas_compuestas.py` son `xfail`: con `EmbeddingsFalsos`
-siguen fallando (XFAIL, no XPASS). Con el índice real solo *problema vs
-crítico* cumple §6.3+§5.1; cierre/reapertura recupera §7 pero aún no §6.1.
-Evidencia reproducible: `docs/evidencia_xfail_rag.md`. El texto plano de
-tablas de POL-TIC-05 se omite a favor de una representación clave-valor; no
-se altera `materiales/`.
+LLM y `RAG_MIN_SCORE` no está calibrado con un gold set. Las tres regresiones
+de cierre/reapertura y problema/crítico ya pasan (fake e índice real); detalle
+en `docs/evidencia_xfail_rag.md`. El texto plano de tablas de POL-TIC-05 se
+omite a favor de una representación clave-valor; no se altera `materiales/`.
 
 ### Abstención sin evidencia
 
@@ -663,18 +775,20 @@ instala `requirements-dev.txt`, Ruff (errores críticos) y pytest. El
 después de calidad, sin introducir código inválido.
 
 Evidencia: `docs/evidencia_ci.md`. Local equivalente:
-**Ruff OK; 196 passed, 3 xfailed**. Remotas:
+**Ruff OK; 199 passed**. Remotas (evidencia del diseño verde/rojo; el conteo
+de tests puede ser de un commit anterior al quitar los `xfail`):
 [verde](https://github.com/JDaniloN/mesa-ayuda-inteligente/actions/runs/32885632111)
 y
 [roja](https://github.com/JDaniloN/mesa-ayuda-inteligente/actions/runs/32885796312).
+Tras el próximo push, el job verde debe reflejar **199 passed**.
 
-**Fallos anticipados.** Suite roja por embeddings fake; Ruff estricto que
-bloquearía el repo por estilo; dependencias sin pin; evidencia remota inventada.
+**Fallos anticipados.** Dependencias sin pin; evidencia remota inventada;
+regresión de ranking si se desactiva la calibración léxica.
 
 **Alternativas descartadas.** Matrix multi-OS, cobertura obligatoria, fail-fast
-sobre `xfail`, y “romper” un test real para el camino rojo. Se eligió un solo
-runner Ubuntu, reglas críticas de Ruff, `xfail` documentados y un paso final
-condicional para demostrar el rojo sin contaminar la rama.
+agresivo, y “romper” un test real para el camino rojo. Se eligió un solo
+runner Ubuntu, reglas críticas de Ruff y un paso final condicional para
+demostrar el rojo sin contaminar la rama.
 
 ### Seguridad del código asistido por IA
 
@@ -732,7 +846,8 @@ aplicadas, métricas de latencia/tokens y estándar de revisión de código IA.
 
 Cada ítem declara fallos anticipados, alternativas descartadas y riesgos
 residuales. Residual explícito del RAG: `RAG_MIN_SCORE` es provisional (sin
-gold set) y tres rankings quedan como `xfail` (detalle en `docs/evidencia_xfail_rag.md`).
+gold set). Los tres rankings de cierre/reapertura y problema/crítico ya
+pasan; evidencia en `docs/evidencia_xfail_rag.md`.
 
 **Qué quedó pendiente.** Nada de esta etapa para la declaración: la tabla
 de la etapa 3 en `docs/declaracion_uso_ia.md` está completa. La calibración
@@ -789,8 +904,9 @@ descartó (n8n, cola asíncrona, vectores en SQL, etc.), no solo qué se eligió
 
 ### Orquestación (demo mínima)
 
-**Qué se hizo.** Aún no (fase 2). El paquete `src/orquestacion/` está reservado.
-El flujo a demostrar, aunque sea parcial:
+**Qué se hizo.** Aún no (fase 2). El paquete `src/orquestacion/` existe como
+reserva (`__init__.py` vacío); no hay demo ejecutable ni
+`tests/orquestacion/`. El flujo a demostrar, aunque sea parcial:
 
 1. Clasificar la solicitud (`src/ia/`).
 2. Consultar el RAG (`src/rag/` / `POST /politicas/consultar`).
@@ -1035,8 +1151,10 @@ límites de fecha, N+1, mezcla de responsabilidades) y tres reglas de equipo
 que se puedan aplicar en el siguiente PR.
 
 **Qué quedó pendiente.** La revisión escrita y el estándar. El video de
-recorrido (máximo 5 min: qué se construyó, hasta qué etapa, dos decisiones,
-qué se haría distinto) se graba al cerrar la entrega.
+recorrido (máximo 5 min) sigue el [guion del video](#guion-del-video-5-minutos):
+qué se construyó, hasta qué etapa, dos decisiones (p. ej. degradado sin tumbar
+el alta; abstenerse sin inventar) y qué se haría distinto. Se graba al cerrar
+la entrega.
 
 ### Cierre de la etapa 5
 
@@ -1061,7 +1179,7 @@ src/
   ia/                categoría y prioridad, desacoplado
   legacy/            copia corregida del módulo heredado
   rag/               políticas, citas y abstención
-  orquestacion/      clasificar → consultar → responder → escalar (etapa 4)
+  orquestacion/      reserva etapa 4 (stub; demo aún no implementada)
 tests/               mismo mapa que src/; evaluacion/ en la etapa 5
 sql/                 consultas de la etapa 1 y runner
 docs/                declaración IA, contrato, funcional, legado, CI,

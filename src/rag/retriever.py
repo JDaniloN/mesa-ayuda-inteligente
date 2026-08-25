@@ -58,6 +58,7 @@ MARGEN_DIVERSIDAD = 0.15
 MAX_CONTEXTO = 8
 MAX_CANDIDATOS = 200
 BOOST_TITULO = 0.08
+BOOST_FAMILIA = 0.35
 CONECTORES = (
     " frente a ",
     " en comparación con ",
@@ -69,6 +70,52 @@ INICIO_INTERROGATIVO = re.compile(
     r"con cuant)",
     re.IGNORECASE,
 )
+# Pares verbo/nombre frecuentes en políticas; el fake y el léxico no
+# cruzan "cerrarlo"↔"cierre" ni "reabrirlo"↔"reapertura" por prefijo.
+FAMILIAS_LEXICAS = (
+    frozenset(
+        {
+            "cerrar",
+            "cierra",
+            "cierres",
+            "cierre",
+            "cerrado",
+            "cerrada",
+            "cerrados",
+            "cerradas",
+            "cerrarlo",
+            "cerrarla",
+            "cerrarse",
+        }
+    ),
+    frozenset(
+        {
+            "reabrir",
+            "reabre",
+            "reabran",
+            "reabrirlo",
+            "reabrirla",
+            "reabrirse",
+            "reabierto",
+            "reabierta",
+            "reapertura",
+            "reaperturas",
+        }
+    ),
+    frozenset(
+        {
+            "critico",
+            "critica",
+            "criticos",
+            "criticas",
+            "criticidad",
+        }
+    ),
+)
+COMPLEMENTOS_SECCION = {
+    "cierre": ("reapertura",),
+    "reapertura": ("cierre",),
+}
 
 
 class Retriever:
@@ -93,14 +140,19 @@ class Retriever:
             ranked.append(self._rankear(partes[etiqueta], vec, etiqueta))
         fusionados = _merge_por_id(ranked)
         fusionados.sort(key=lambda item: item.score, reverse=True)
-        directos = _diversificar(fusionados, limite, etiquetas=etiquetas)
+        directos = _diversificar(
+            fusionados,
+            limite,
+            etiquetas=etiquetas,
+            por_consulta=dict(zip(etiquetas, ranked)),
+        )
         coverage = {
             etiqueta: any(etiqueta in hit.source_queries for hit in directos)
             for etiqueta in etiquetas
             if etiqueta != "original" or len(etiquetas) == 1
         }
         tope = min(limite + 4, MAX_CONTEXTO)
-        hits = _expandir(directos, self._almacen.listar(), tope)
+        hits = _expandir(directos, self._almacen.listar(), tope, pregunta=pregunta)
         return ResultadoRecuperacion(
             hits=hits,
             coverage=coverage,
@@ -196,7 +248,9 @@ def _partir_por_y(pregunta: str) -> list[str]:
         if not izquierda or not derecha:
             continue
         una = f"{preambulo}¿{izquierda}?".strip()
-        dos = f"{preambulo}¿{derecha}?".strip()
+        # La segunda rama no hereda el preámbulo condicional: contaminaría
+        # "reabre tres veces" sobre la subconsulta de "crítico", etc.
+        dos = f"¿{derecha}?".strip()
         if not dos.endswith("?"):
             dos = dos + "?"
         return [una, dos]
@@ -241,6 +295,7 @@ def _diversificar(
     ranked: list[Hit],
     limite: int,
     etiquetas: list[str] | None = None,
+    por_consulta: dict[str, list[Hit]] | None = None,
 ) -> list[Hit]:
     if not ranked or limite <= 0:
         return []
@@ -255,20 +310,17 @@ def _diversificar(
         ids.add(chunk_id)
 
     _agregar(ranked[0])
+    # Ancla una evidencia propia por subconsulta (antes del merge etiquetaba
+    # casi todos los tops con todas las etiquetas y no diversificaba hechos).
     for etiqueta in etiquetas or []:
         if etiqueta == "original":
             continue
-        mejor = next(
-            (
-                hit
-                for hit in ranked
-                if etiqueta in hit.source_queries
-                and str(hit.metadata.get("chunk_id") or "") not in ids
-            ),
-            None,
-        )
-        if mejor is not None:
-            _agregar(mejor)
+        lista = (por_consulta or {}).get(etiqueta) or [
+            hit for hit in ranked if etiqueta in hit.source_queries
+        ]
+        ancla = _ancla_subconsulta(lista, ids)
+        if ancla is not None:
+            _agregar(ancla)
     omitidos: list[Hit] = []
     for candidato in ranked:
         if len(elegidos) >= limite:
@@ -302,6 +354,33 @@ def _diversificar(
     return elegidos[:limite]
 
 
+def _ancla_subconsulta(lista: list[Hit], ids: set[str]) -> Hit | None:
+    """Prefiere el top cuya familia de título coincide con la de la consulta."""
+    if not lista:
+        return None
+    # Inferir familia de la consulta desde source_queries no basta; usamos el
+    # lexical_score ya calculado y priorizamos título alineado con tokens del hit
+    # que más aporta: si hay hits con familia en título, el primero de esos.
+    con_titulo: list[Hit] = []
+    resto: list[Hit] = []
+    for hit in lista:
+        chunk_id = str(hit.metadata.get("chunk_id") or "")
+        if not chunk_id or chunk_id in ids:
+            continue
+        titulo_fams = _familias_presentes(
+            _tokens(str(hit.metadata.get("titulo_seccion") or ""))
+        )
+        # Heurística: si el score léxico es alto y el título tiene familia
+        # típica de política (cierre/reapertura/crítico), priorizarlo.
+        if titulo_fams and hit.lexical_score >= 0.35:
+            con_titulo.append(hit)
+        else:
+            resto.append(hit)
+    for hit in con_titulo + resto:
+        return hit
+    return None
+
+
 def _menor(seccion: str) -> int | None:
     partes = str(seccion).split(".")
     if len(partes) != 2:
@@ -312,7 +391,12 @@ def _menor(seccion: str) -> int | None:
         return None
 
 
-def _expandir(directos: list[Hit], inventario: list[Hit], tope: int) -> list[Hit]:
+def _expandir(
+    directos: list[Hit],
+    inventario: list[Hit],
+    tope: int,
+    pregunta: str = "",
+) -> list[Hit]:
     resultado = list(directos)
     vistos = {str(hit.metadata.get("chunk_id") or "") for hit in resultado}
     indice = {
@@ -333,23 +417,90 @@ def _expandir(directos: list[Hit], inventario: list[Hit], tope: int) -> list[Hit
             vecino = indice.get((codigo, f"{padre}.{menor + delta}"))
             if vecino is None:
                 continue
-            chunk_id = str(vecino.metadata.get("chunk_id") or "")
-            if not chunk_id or chunk_id in vistos:
-                continue
-            resultado.append(
-                replace(
-                    vecino,
-                    retrieval_type="expansion",
-                    source_queries=(),
-                    score=0.0,
-                    vector_score=0.0,
-                    lexical_score=0.0,
-                )
-            )
-            vistos.add(chunk_id)
-            if len(resultado) >= tope:
+            if _anexar_expansion(resultado, vistos, vecino, tope):
                 return resultado
+    _expandir_complementarios(resultado, vistos, inventario, pregunta, tope)
     return resultado
+
+
+def _anexar_expansion(
+    resultado: list[Hit],
+    vistos: set[str],
+    vecino: Hit,
+    tope: int,
+) -> bool:
+    chunk_id = str(vecino.metadata.get("chunk_id") or "")
+    if not chunk_id or chunk_id in vistos:
+        return len(resultado) >= tope
+    resultado.append(
+        replace(
+            vecino,
+            retrieval_type="expansion",
+            source_queries=(),
+            score=0.0,
+            vector_score=0.0,
+            lexical_score=0.0,
+        )
+    )
+    vistos.add(chunk_id)
+    return len(resultado) >= tope
+
+
+def _expandir_complementarios(
+    resultado: list[Hit],
+    vistos: set[str],
+    inventario: list[Hit],
+    pregunta: str,
+    tope: int,
+) -> None:
+    """Si la pregunta pide cierre y reapertura, completa el par en el mismo doc."""
+    familias_q = _familias_presentes(_tokens(pregunta))
+    fam_cierre = _familia_por_nombre("cierre")
+    fam_reapertura = _familia_por_nombre("reapertura")
+    if fam_cierre not in familias_q or fam_reapertura not in familias_q:
+        return
+    titulos_directos = {
+        (
+            str(hit.metadata.get("codigo") or ""),
+            _sin_diacriticos(_normalizar(str(hit.metadata.get("titulo_seccion") or ""))),
+        )
+        for hit in resultado
+        if hit.retrieval_type == "direct"
+    }
+    candidatos: list[Hit] = []
+    for codigo, titulo in titulos_directos:
+        for destino in COMPLEMENTOS_SECCION.get(titulo, ()):
+            for item in inventario:
+                if str(item.metadata.get("codigo") or "") != codigo:
+                    continue
+                titulo_item = _sin_diacriticos(
+                    _normalizar(str(item.metadata.get("titulo_seccion") or ""))
+                )
+                if titulo_item != destino:
+                    continue
+                candidatos.append(item)
+    # Preferir la cláusula de plazo (6.1) antes que 6.2/6.3.
+    candidatos.sort(key=lambda item: str(item.metadata.get("seccion") or ""))
+    for item in candidatos:
+        if _anexar_expansion(resultado, vistos, item, tope):
+            return
+
+
+def _familia_por_nombre(nombre: str) -> frozenset[str]:
+    clave = _sin_diacriticos(nombre)
+    for familia in FAMILIAS_LEXICAS:
+        if clave in familia:
+            return familia
+    return frozenset()
+
+
+def _familias_presentes(tokens: set[str]) -> set[frozenset[str]]:
+    planos = {_sin_diacriticos(token) for token in tokens}
+    halladas: set[frozenset[str]] = set()
+    for familia in FAMILIAS_LEXICAS:
+        if planos & familia:
+            halladas.add(familia)
+    return halladas
 
 
 def _score_lexical(pregunta: str, texto: str, metadata: dict) -> float:
@@ -384,6 +535,23 @@ def _score_lexical(pregunta: str, texto: str, metadata: dict) -> float:
         _cubre(token, tokens_titulo) and not _cubre(token, d) for token in q
     ):
         extra += BOOST_TITULO
+    familias_q = _familias_presentes(q)
+    familias_titulo = _familias_presentes(tokens_titulo)
+    # Solo el título ancla la familia: evita que «tasa de reapertura» en
+    # Indicadores (§8) quite el puesto al plazo real (§6.1).
+    if familias_q & familias_titulo:
+        extra += BOOST_FAMILIA
+        matched = max(matched, 2)
+    q_planos = {_sin_diacriticos(token) for token in q}
+    d_planos = {_sin_diacriticos(token) for token in d}
+    if q_planos & {"tiempo", "cuanto", "cuantos", "plazo"} and d_planos & {
+        "dias",
+        "habiles",
+        "horas",
+        "minutos",
+        "plazo",
+    }:
+        extra += 0.22
     score = min(1.0, solapamiento + extra)
     if matched < 2:
         score *= 0.35
@@ -393,6 +561,13 @@ def _score_lexical(pregunta: str, texto: str, metadata: dict) -> float:
 def _cubre(token: str, vocabulario: set[str]) -> bool:
     if token in vocabulario:
         return True
+    plano = _sin_diacriticos(token)
+    planos = {_sin_diacriticos(candidato) for candidato in vocabulario}
+    if plano in planos:
+        return True
+    for familia in FAMILIAS_LEXICAS:
+        if plano in familia and planos & familia:
+            return True
     raiz = token[:5] if len(token) >= 5 else token
     for candidato in vocabulario:
         if len(candidato) >= 5 and (
@@ -404,6 +579,11 @@ def _cubre(token: str, vocabulario: set[str]) -> bool:
         ):
             return True
     return False
+
+
+def _sin_diacriticos(texto: str) -> str:
+    descompuesto = unicodedata.normalize("NFD", texto or "")
+    return "".join(car for car in descompuesto if unicodedata.category(car) != "Mn")
 
 
 def _normalizar(texto: str) -> str:
