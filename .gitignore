@@ -24,6 +24,7 @@ Thumbs.db
 
 # Salidas locales
 data/salida/
+solicitud.json
 *.log
 .coverage
 htmlcov/
