@@ -9,6 +9,9 @@ etapas en orden: qué se implementó, cómo probarlo, qué debe aparecer y qué
 sigue pendiente. Un solo README raíz, como pide el enunciado; las etapas 2 a 5
 no abren otro.
 
+Nota: 
+Para Desarrollar e implementar la solucion a cada una de las etapas utilice los modelos de grok 4.5 y chatgpt 5.6 sol ambos en su version high para obtener los mejores resultados posibles, poniendo como objetivo lograr el criterio 4 en cada una de los items que comprendia cada etapa y asi poder culminar de forma eficiente el proyecto dentro de los 3 dias.
+
 ---
 
 ## Cómo leer este repositorio
