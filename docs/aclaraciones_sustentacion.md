@@ -271,3 +271,46 @@ No.
 | `origen=proveedor` | El LLM contestó y la etiqueta está en el catálogo |
 
 `GET /health` → `clasificador: proveedor` solo dice que había URL y clave **al arrancar**, no que haya saldo.
+
+---
+
+## Corrección del legado (etapa 2)
+
+El original permanece en `materiales/legacy/legacy_module.py`. Se copió a
+`src/legacy/` para aplicar tres cambios puntuales y dejar el paquete recibido
+como evidencia. Las tres regresiones fallaron antes y pasan después:
+`python -m pytest tests/legacy/ -q`.
+
+### S1 — ¿Qué tickets perdía el informe?
+
+Los creados exactamente el primer y el último día. El contrato decía que los
+extremos eran inclusivos, pero el código usaba `>` y `<`.
+
+**Cómo lo digo:** *La documentación y el código se contradecían. No cambié el
+contrato: cambié dos comparadores y fijé ambos límites con una prueba.*
+
+La alternativa de usar un rango semiabierto
+`inicio <= fecha < primer_dia_siguiente` es válida para fechas y horas, pero
+cambiaría el significado del parámetro `fin` de esta función.
+
+### S2 — ¿Por qué se inflaba el segundo resumen?
+
+Python evalúa `{}` una sola vez al definir la función. Todas las llamadas sin
+acumulador reutilizaban el mismo diccionario.
+
+**Cómo lo digo:** *No era un error de suma; era estado escondido entre
+llamadas. `None` crea una cesta nueva, pero mantuve el acumulador explícito
+para no romper compatibilidad.*
+
+### S3 — ¿Por qué `estado.lower()` no era suficiente?
+
+Normalizar mayúsculas solo encontraría más tickets cuyo estado **actual** es
+Reabierto. El indicador pregunta cuántos se reabrieron alguna vez: un ticket
+puede estar Cerrado hoy y conservar `reaperturas=2`.
+
+**Cómo lo digo:** *El estado es la foto de hoy; reaperturas es el hecho
+histórico. Cuento tickets con contador positivo, no sumo eventos.*
+
+Un contador vacío o corrupto no se transforma en `1`: confirma
+desconocimiento, no cero reaperturas. Inventarlo contaminaría indicadores
+posteriores.
