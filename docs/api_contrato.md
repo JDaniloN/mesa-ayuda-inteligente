@@ -18,11 +18,12 @@ No se versiona una copia estática de `openapi.json`: quedaría desactualizada.
 - Identificadores: prefijo `SOL-`.
 - Todas las respuestas llevan `X-Request-ID` con un UUID para correlacionar
   la respuesta con los logs JSON.
-- Las rutas de solicitudes requieren Bearer. `/health` es público.
+- Las rutas de solicitudes, políticas y métricas requieren Bearer. `/health`
+  es público.
 
 ## Autenticación
 
-Las rutas bajo `/solicitudes` y `/politicas` esperan:
+Las rutas bajo `/solicitudes`, `/politicas` y `/metricas` esperan:
 
 ```http
 Authorization: Bearer <API_TOKEN>
@@ -229,6 +230,37 @@ Otros códigos:
 `RAG_INDICE_DIR` (`data/salida/rag` por defecto) y no se versiona. El recorte
 `limite` del contrato no cambia; por dentro se puede recuperar un pool mayor
 para partir preguntas compuestas, diversificar y expandir cláusulas hermanas.
+
+## Consultar métricas agregadas
+
+```http
+GET /metricas/resumen
+```
+
+Requiere Bearer. Devuelve latencia HTTP acumulada y tokens reportados por las
+llamadas de clasificación, embeddings y generación RAG:
+
+```json
+{
+  "peticiones": {
+    "total": 12,
+    "errores_5xx": 1,
+    "latencia_ms": {"promedio": 42.1, "maxima": 130.0, "acumulada": 505.2}
+  },
+  "ia": {
+    "llamadas": 4,
+    "tokens_entrada": 320,
+    "tokens_salida": 80,
+    "tokens_total": 400,
+    "uso_no_reportado": 0,
+    "por_operacion": {}
+  }
+}
+```
+
+Los contadores viven en memoria y se reinician con el proceso. Si el proveedor
+omite `usage`, la llamada incrementa `uso_no_reportado`; el servicio no estima
+ni inventa tokens. El endpoint no entrega prompts, cuerpos ni credenciales.
 
 ## Proveedor de IA y degradación
 

@@ -22,6 +22,7 @@ def test_contrato_publica_las_operaciones_actuales():
         "/solicitudes",
         "/solicitudes/{id_solicitud}",
         "/politicas/consultar",
+        "/metricas/resumen",
     }
     assert paths["/health"]["get"]["operationId"] == "consultar_salud"
     assert paths["/solicitudes"]["post"]["operationId"] == "crear_solicitud"
@@ -31,6 +32,7 @@ def test_contrato_publica_las_operaciones_actuales():
         == "consultar_solicitud"
     )
     assert paths["/politicas/consultar"]["post"]["operationId"] == "consultar_politica"
+    assert paths["/metricas/resumen"]["get"]["operationId"] == "consultar_metricas"
     assert set(paths["/politicas/consultar"]["post"]["responses"]) == {
         "200",
         "401",
@@ -86,6 +88,7 @@ def test_respuestas_documentan_header_de_correlacion():
         paths["/solicitudes"]["get"]["responses"]["200"],
         paths["/solicitudes/{id_solicitud}"]["get"]["responses"]["200"],
         paths["/politicas/consultar"]["post"]["responses"]["200"],
+        paths["/metricas/resumen"]["get"]["responses"]["200"],
     ]
 
     for respuesta in respuestas:

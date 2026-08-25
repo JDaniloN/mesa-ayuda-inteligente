@@ -2,6 +2,7 @@
 
 from src.rag.embeddings import EmbeddingsFalsos
 from src.rag.generador import GeneradorFalso
+from src.rag.retriever import MAX_CANDIDATOS, Retriever
 from src.rag.servicio import ServicioPoliticas
 from src.rag.vector_store import AlmacenChroma
 
@@ -65,3 +66,21 @@ def test_citas_salen_de_metadatos_recuperados(tmp_path):
         assert cita["seccion"]
         assert cita["titulo"]
         assert cita["pagina"] >= 1
+
+
+def test_pool_vectorial_tiene_tope_fijo():
+    class AlmacenGrande:
+        consultados = 0
+
+        def cantidad(self):
+            return 10_000
+
+        def consultar(self, _vector, limite):
+            self.consultados = limite
+            return []
+
+    almacen = AlmacenGrande()
+    retriever = Retriever(almacen, EmbeddingsFalsos())
+
+    assert retriever._rankear("consulta", [1.0], "original") == []
+    assert almacen.consultados == MAX_CANDIDATOS

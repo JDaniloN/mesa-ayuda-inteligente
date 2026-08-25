@@ -14,6 +14,7 @@ La API ofrece un único punto para:
 3. Entregar un identificador para consultar el caso.
 4. Permitir que la mesa liste y filtre la carga recibida.
 5. Consultar políticas internas con respuesta citada o abstención explícita.
+6. Consultar latencia y consumo de tokens agregados para operar la demo.
 
 ## Para quién
 
@@ -63,6 +64,15 @@ proveedor de IA no responde, la solicitud se crea igualmente con:
 
 Esto permite que un agente la revise después. El sistema no presenta esa
 clasificación como si proviniera del modelo.
+
+## Métricas operativas
+
+Cada petición registra latencia y estado sin guardar su cuerpo. Cada llamada
+al proveedor agrega los tokens que este reporta para clasificación, embeddings
+o generación RAG. Un operador autenticado consulta el resumen en
+`GET /metricas/resumen`. Los contadores pertenecen a la instancia actual y se
+reinician al arrancar; no son facturación ni sustituyen la consola del
+proveedor.
 
 ## Reglas funcionales
 
@@ -121,6 +131,7 @@ mensaje fijo, `citas: []`, sin llamada al generador.
 - Menos duplicados causados por reintentos del cliente.
 - Un contrato único para la interfaz y otras integraciones.
 - Errores comprensibles y rastreables mediante `X-Request-ID`.
+- Latencia y consumo de IA visibles sin exponer datos personales.
 
 Estos beneficios son hipótesis funcionales. Su impacto deberá medirse con
 datos reales antes de afirmar reducción de tiempos o aumento de precisión.

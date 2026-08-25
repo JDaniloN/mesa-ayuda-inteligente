@@ -346,3 +346,64 @@ un plazo de un fragmento a otra parte de la pregunta.*
 Descartado: reranker con LLM, HyDE, GraphRAG, otro vector store, vectores
 falsos en producción y penalizar en bloque las FAQ (hundían `POL-GTH-01` §8,
 que era el mejor vector de la consulta de vacaciones).
+
+---
+
+## Etapa 3 — Abstención
+
+**Cómo lo digo:** *Si no hay respaldo, lo digo. No invento. El umbral mira
+solo el mejor hit directo; si queda bajo el mínimo, mensaje fijo, citas vacías
+y no llamo al generador.*
+
+Fallos: fuera de dominio, score engañoso, mitad sin evidencia, sin índice.
+Descartado: umbral por tipo de pregunta, juez LLM y devolver citas débiles
+con un “no sé”. La prueba HTTP de la capital de Japón demuestra el contrato.
+
+Pendiente declarado: calibrar `RAG_MIN_SCORE` con un gold set.
+
+---
+
+## Etapa 3 — CI
+
+**Cómo lo digo:** *En cada envío corro análisis estático crítico y la suite.
+Para enseñar el rojo no rompo un test: disparo un paso final opcional.*
+
+Fallos: embeddings fake que fallaban tres rankings reales, Ruff de estilo que
+bloquearía el repo, y fingir URLs remotas. Descartado: matrix multi-OS,
+cobertura obligatoria y fallar los `xfail`. Ubuntu + Ruff crítico + `xfail`
+documentados + `demostrar_fallo` en `workflow_dispatch`.
+
+---
+
+## Etapa 3 — Seguridad del código IA
+
+**Cómo lo digo:** *Revisé el código que la IA ayudó a escribir. Corregí
+inyección por delimitadores, filtración de códigos del proveedor, pool sin
+tope y dependencias flotantes. Cada hallazgo tiene severidad, evidencia y
+prueba.*
+
+Descartado como bloqueo de la demo: WAF, rate limit de infraestructura y
+escaneo CVE continuo. Residual: expansiones sin score propio y falta de
+throttling por token.
+
+---
+
+## Etapa 3 — Instrumentación
+
+**Cómo lo digo:** *Cada petición deja latencia. Cada llamada al proveedor
+deja los tokens que él reporta. Si no trae `usage`, marco
+`uso_no_reportado`; no estimo. El resumen es de esta instancia y exige Bearer.*
+
+Descartado: Prometheus, estimar con tiktoken y persistir en disco. No es
+facturación; es operación de la demo.
+
+---
+
+## Etapa 3 — Artefacto del equipo
+
+**Cómo lo digo:** *Preferí una página de revisión de código generado por IA
+antes que una guía larga de prompts o de commits. Cubre alcance, fuentes,
+fallos seguros, exposición, pruebas y la puerta mínima antes del commit.*
+
+Descartado: checklist solo de mensajes de commit y un manual de prompts
+genéricos sin definición de terminado.

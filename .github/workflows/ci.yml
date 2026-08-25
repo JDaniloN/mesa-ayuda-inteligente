@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      demostrar_fallo:
+        description: "Falla al final para demostrar el camino rojo"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  calidad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Instalar dependencias
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Análisis estático
+        run: ruff check --select E9,F63,F7,F82 src tests
+
+      - name: Pruebas
+        run: python -m pytest -q
+
+      - name: Fallo controlado para evidencia
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.demostrar_fallo }}
+        run: python -c "raise SystemExit('Fallo controlado solicitado para demostrar CI rojo')"

@@ -1,5 +1,7 @@
 """Consulta de políticas internas con citas verificables."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from src.api.auth import exigir_token
@@ -8,6 +10,8 @@ from src.api.modelos import ConsultaPoliticaEntrada, ConsultaPoliticaSalida, Res
 from src.api.rutas import CABECERA_REQUEST_ID
 from src.rag.modelos import ErrorRag
 from src.rag.servicio import ServicioPoliticas
+
+log = logging.getLogger("mesa.rag")
 
 router = APIRouter(
     prefix="/politicas",
@@ -56,9 +60,16 @@ def consultar(entrada: ConsultaPoliticaEntrada, request: Request):
     try:
         resultado = servicio.consultar_politica(entrada.pregunta, entrada.limite)
     except ErrorRag as exc:
+        log.warning(
+            "rag_request_unavailable",
+            extra={"event": "rag_request_unavailable", "reason": exc.codigo},
+        )
         raise HTTPException(
             status_code=exc.status,
-            detail=cuerpo(exc.codigo, exc.mensaje),
+            detail=cuerpo(
+                exc.codigo,
+                "El servicio de consulta de políticas no está disponible.",
+            ),
         ) from exc
     return {
         "respuesta": resultado.respuesta,

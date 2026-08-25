@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from hashlib import sha256
+import logging
+import re
 from typing import Optional
 
 import httpx
-import re
 
+from src.metricas import RegistroMetricas
 from src.rag.modelos import ErrorRag, PuertoEmbeddings
+
+log = logging.getLogger("mesa.rag")
 
 
 class EmbeddingsHttp(PuertoEmbeddings):
@@ -19,12 +23,14 @@ class EmbeddingsHttp(PuertoEmbeddings):
         modelo: str,
         timeout_s: float = 8.0,
         http: Optional[httpx.Client] = None,
+        metricas: RegistroMetricas | None = None,
     ) -> None:
         self.modelo = modelo
         self._url = _url_embeddings(base_url)
         self._api_key = api_key
         self._propios = http is None
         self._http = http or httpx.Client(timeout=timeout_s)
+        self._metricas = metricas
 
     def embed(self, textos: list[str]) -> list[list[float]]:
         if not textos:
@@ -39,20 +45,45 @@ class EmbeddingsHttp(PuertoEmbeddings):
                 },
             )
         except httpx.TimeoutException as exc:
+            self._registrar_uso(None)
             raise ErrorRag("configuracion", "Timeout al generar embeddings.") from exc
         except httpx.RequestError as exc:
+            self._registrar_uso(None)
             raise ErrorRag("configuracion", "No fue posible conectar con embeddings.") from exc
+        try:
+            cuerpo = respuesta.json()
+        except ValueError:
+            cuerpo = None
+        self._registrar_uso(cuerpo)
         if respuesta.status_code >= 400:
+            log.warning(
+                "rag_provider_error",
+                extra={
+                    "event": "rag_provider_error",
+                    "operation": "embeddings",
+                    "model": self.modelo,
+                    "reason": f"http_{respuesta.status_code}",
+                },
+            )
             raise ErrorRag(
                 "configuracion",
-                f"El proveedor de embeddings respondió {respuesta.status_code}.",
+                "El proveedor de embeddings no está disponible.",
             )
         try:
-            data = respuesta.json()["data"]
+            data = cuerpo["data"]
             ordenados = sorted(data, key=lambda item: item["index"])
             return [item["embedding"] for item in ordenados]
         except (KeyError, TypeError, ValueError) as exc:
             raise ErrorRag("configuracion", "Respuesta de embeddings inválida.") from exc
+
+    def _registrar_uso(self, data: dict | None) -> None:
+        if self._metricas is not None:
+            usage = data.get("usage") if isinstance(data, dict) else None
+            self._metricas.registrar_llamada_ia(
+                "embeddings",
+                self.modelo,
+                usage,
+            )
 
     def close(self) -> None:
         if self._propios:

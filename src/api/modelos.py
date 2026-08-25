@@ -109,5 +109,34 @@ class ConsultaPoliticaSalida(BaseModel):
     citas: list[CitaPolitica]
 
 
+class LatenciaResumen(BaseModel):
+    promedio: float
+    maxima: float
+    acumulada: float
+
+
+class PeticionesResumen(BaseModel):
+    total: int
+    errores_5xx: int
+    latencia_ms: LatenciaResumen
+
+
+class UsoIaOperacion(BaseModel):
+    llamadas: int
+    tokens_entrada: int
+    tokens_salida: int
+    tokens_total: int
+    uso_no_reportado: int
+
+
+class UsoIaResumen(UsoIaOperacion):
+    por_operacion: dict[str, UsoIaOperacion]
+
+
+class MetricasResumen(BaseModel):
+    peticiones: PeticionesResumen
+    ia: UsoIaResumen
+
+
 def ahora_iso() -> str:
     return datetime.now(timezone.utc).isoformat()

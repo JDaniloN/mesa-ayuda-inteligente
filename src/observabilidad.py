@@ -21,6 +21,12 @@ _CAMPOS_SEGUROS = (
     "reason",
     "classification_origin",
     "exception_type",
+    "operation",
+    "model",
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
+    "usage_available",
 )
 
 

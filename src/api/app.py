@@ -19,10 +19,12 @@ from src.api.errores import error_no_controlado, http_excepcion, validacion_inva
 from src.api.modelos import EstadoSalud, RespuestaError
 from src.api.repositorio import Repositorio
 from src.api.rutas import CABECERA_REQUEST_ID, router
+from src.api.rutas_metricas import router as router_metricas
 from src.api.rutas_politicas import router as router_politicas
 from src.configuracion import Configuracion, obtener_configuracion
 from src.ia.fachada import FachadaClasificador
 from src.ia.puerto import PuertoClasificador
+from src.metricas import RegistroMetricas
 from src.rag.servicio import ServicioPoliticas
 from src.observabilidad import (
     configurar_logging,
@@ -40,18 +42,20 @@ def create_app(
     clasificador: PuertoClasificador | None = None,
     consultor_politicas: ServicioPoliticas | None = None,
     configuracion: Configuracion | None = None,
+    metricas: RegistroMetricas | None = None,
 ) -> FastAPI:
     config = configuracion or obtener_configuracion()
     configurar_logging(config.log_level, config.app_env)
+    registro_metricas = metricas or RegistroMetricas()
     clasificador_real = (
         clasificador
         if clasificador is not None
-        else FachadaClasificador.desde_configuracion(config)
+        else FachadaClasificador.desde_configuracion(config, metricas=registro_metricas)
     )
     consultor_real = (
         consultor_politicas
         if consultor_politicas is not None
-        else ServicioPoliticas.desde_configuracion(config)
+        else ServicioPoliticas.desde_configuracion(config, metricas=registro_metricas)
     )
 
     @asynccontextmanager
@@ -80,6 +84,7 @@ def create_app(
     app.state.repositorio = repositorio or Repositorio()
     app.state.clasificador = clasificador_real
     app.state.consultor_politicas = consultor_real
+    app.state.metricas = registro_metricas
     if api_token is not None:
         app.state.api_token = api_token
     else:
@@ -93,6 +98,10 @@ def create_app(
         try:
             response = await call_next(request)
             duracion_ms = round((perf_counter() - inicio) * 1000, 2)
+            registro_metricas.registrar_peticion(
+                duracion_ms,
+                response.status_code,
+            )
             response.headers["X-Request-ID"] = request_id
             nivel = (
                 logging.ERROR
@@ -114,13 +123,15 @@ def create_app(
             )
             return response
         except Exception as exc:
+            duracion_ms = round((perf_counter() - inicio) * 1000, 2)
+            registro_metricas.registrar_peticion(duracion_ms, 500)
             log.error(
                 "http_request_failed",
                 extra={
                     "event": "http_request_failed",
                     "method": request.method,
                     "path": request.url.path,
-                    "duration_ms": round((perf_counter() - inicio) * 1000, 2),
+                    "duration_ms": duracion_ms,
                     "exception_type": type(exc).__name__,
                 },
             )
@@ -146,6 +157,7 @@ def create_app(
     app.add_exception_handler(Exception, error_no_controlado)
     app.include_router(router)
     app.include_router(router_politicas)
+    app.include_router(router_metricas)
 
     @app.get(
         "/health",

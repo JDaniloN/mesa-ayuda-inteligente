@@ -560,7 +560,8 @@ en Chroma local (`data/salida/rag/`, no se versiona).
   `citas: []` y **no** llama al generador.
 - El valor inicial `0.22` es **provisional**: basta para abstenerse ante
   «¿Cuál es la capital de Japón?» con embeddings de prueba. No es una
-  calibración con gold set; eso pertenece al criterio de abstención.
+  calibración con gold set; ese residual quedó declarado en el ítem de
+  abstención.
 - Sin clave de embeddings o sin índice: **503**, sin vectores inventados.
 - Si cambia el hash de los PDF, el modelo o la dimensión, se borra la
   colección para no dejar chunks huérfanos. Un índice de otro modelo responde
@@ -602,18 +603,102 @@ No encontré información suficiente en las políticas proporcionadas para respo
 y `citas: []`.
 
 **Qué quedó pendiente de este ítem.** No se sustituye Chroma, no hay reranker
-LLM y `RAG_MIN_SCORE` no está calibrado con un gold set. Tres pruebas
-automatizadas (cierre/reapertura `§7`+`§6.1`, crítico `§5.1`, y el ancla de
-multi-query de cierre) siguen fallando con embeddings fake de test; la
-evaluación manual con el índice real las cubre. El texto plano de tablas de
-POL-TIC-05 se omite a favor de una representación clave-valor; no se altera
-`materiales/`.
+LLM y `RAG_MIN_SCORE` no está calibrado con un gold set. Tres regresiones
+(cierre/reapertura `§7`+`§6.1`, crítico `§5.1`, y el ancla de multi-query de
+cierre) son `xfail` documentados porque el embedding fake no reproduce esos
+rankings; la evaluación manual con el índice real sí los cubre. El texto plano
+de tablas de POL-TIC-05 se omite a favor de una representación clave-valor;
+no se altera `materiales/`.
+
+### Abstención sin evidencia
+
+El mismo endpoint devuelve un mensaje fijo y `citas: []` cuando el mejor hit
+directo queda bajo `RAG_MIN_SCORE`; en ese camino no se llama al generador.
+La prueba HTTP `test_http_se_abstiene_sin_evidencia_documental` usa «¿Cuál es
+la capital de Japón?» y comprueba la respuesta completa.
+
+**Fallos anticipados.** Pregunta fuera de dominio; score alto pero irrelevante;
+pregunta cubierta parcialmente; índice vacío o sin embeddings. El umbral solo
+mira hits `direct`; no se usa coverage por subconsulta para inventar la mitad
+faltante.
+
+**Alternativas descartadas.** Umbral por tipo de pregunta, LLM-as-judge antes
+de abstenerse, y devolver “no sé” con citas débiles. El umbral único y el
+mensaje fijo cumplen el criterio con una prueba HTTP demostrativa; la
+calibración con gold set queda explícita como pendiente.
+
+### Integración continua
+
+`.github/workflows/ci.yml` corre en cada push y pull request con Python 3.10:
+instala `requirements-dev.txt`, Ruff (errores críticos) y pytest. El
+`workflow_dispatch` ofrece `demostrar_fallo` para un job rojo deliberado
+después de calidad, sin introducir código inválido.
+
+Evidencia: `docs/evidencia_ci.md`. Local equivalente:
+**Ruff OK; 196 passed, 3 xfailed**. Las URLs remotas se agregan tras el primer
+push.
+
+**Fallos anticipados.** Suite roja por embeddings fake; Ruff estricto que
+bloquearía el repo por estilo; dependencias sin pin; evidencia remota inventada.
+
+**Alternativas descartadas.** Matrix multi-OS, cobertura obligatoria, fail-fast
+sobre `xfail`, y “romper” un test real para el camino rojo. Se eligió un solo
+runner Ubuntu, reglas críticas de Ruff, `xfail` documentados y un paso final
+condicional para demostrar el rojo sin contaminar la rama.
+
+### Seguridad del código asistido por IA
+
+`docs/informe_seguridad_ia.md` documenta cuatro hallazgos con severidad,
+evidencia y corrección aplicada: delimitadores del prompt, exposición de
+errores del proveedor, pool vectorial sin tope y dependencias RAG flotantes.
+Cada corrección tiene prueba automatizada.
+
+**Fallos anticipados.** El modelo obedece instrucciones en la pregunta; el
+503 filtra códigos del proveedor; una colección grande agota cuota/CPU; un
+`pip install` resuelve versiones distintas.
+
+**Alternativas descartadas.** WAF/rate limit de infraestructura, escaneo CVE
+continuo, y citar solo hits `direct` (se conserva la expansión como contexto
+deliberado, con riesgo residual declarado). Se priorizó lo corregible en el
+código de la demo autenticada.
+
+### Instrumentación
+
+El middleware conserva `duration_ms` por petición y agrega total, errores 5xx,
+promedio, máximo y latencia acumulada. Los tres clientes de IA registran
+tokens de entrada, salida y total desde `usage`; si el proveedor no los
+entrega, incrementan `uso_no_reportado` en vez de estimar.
+
+`GET /metricas/resumen` requiere Bearer y solo expone agregados de la
+instancia, sin prompts, cuerpos ni datos personales.
+
+**Fallos anticipados.** Contadores concurrentes corruptos; inventar tokens;
+exponer prompts en el resumen; perder el resumen al reiniciar.
+
+**Alternativas descartadas.** Prometheus/OpenTelemetry, estimar tokens con
+tiktoken, y persistir métricas en disco. Un acumulador en memoria thread-safe
+cumple el criterio de la demo; no es facturación ni sustituye la consola del
+proveedor.
+
+### Artefacto para el equipo
+
+`docs/estandar_revision_codigo_ia.md` es la guía breve reutilizable: alcance,
+verificación de fuentes, entradas adversariales, exposición de datos,
+pruebas, puerta mínima de commit y definición de terminado.
+
+**Fallos anticipados.** Aceptar diffs “porque compiló”; mezclar alcance;
+confundir afirmación del modelo con evidencia; omitir pruebas de error.
+
+**Alternativas descartadas.** Guía de prompts genéricos, checklist de commits
+sin puerta de calidad, y un manual largo. Se eligió revisión de código IA
+porque cubre prompts, commits y seguridad en una sola página accionable.
 
 ### Cierre de la etapa 3
 
-**Qué quedó pendiente.** CI (`ci/` todavía es un marcador), seguridad
-avanzada, métricas de retrieval en CI, el resto de criterios de la etapa y la
-declaración de uso de IA correspondiente.
+Los ítems de complejidad y calidad de esta entrega cumplen el criterio 4 en
+diseño: fallos anticipados, alternativas justificadas y riesgos residuales
+declarados. Queda pendiente a mano la declaración de uso de IA y, tras el
+push, pegar las dos URLs remotas de CI en `docs/evidencia_ci.md`.
 
 ---
 

@@ -56,6 +56,7 @@ STOPWORDS = {
 MAX_POR_GRUPO = 2
 MARGEN_DIVERSIDAD = 0.15
 MAX_CONTEXTO = 8
+MAX_CANDIDATOS = 200
 BOOST_TITULO = 0.08
 CONECTORES = (
     " frente a ",
@@ -107,7 +108,7 @@ class Retriever:
         )
 
     def _rankear(self, pregunta: str, vector: list[float], etiqueta: str) -> list[Hit]:
-        pool = max(self._almacen.cantidad(), 1)
+        pool = min(max(self._almacen.cantidad(), 1), MAX_CANDIDATOS)
         hits = self._almacen.consultar(vector, pool)
         fusionados = []
         for hit in hits:

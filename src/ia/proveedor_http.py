@@ -10,6 +10,7 @@ import httpx
 
 from src.ia.catalogo import en_catalogo, prompt_sistema
 from src.ia.modelos import Clasificacion
+from src.metricas import RegistroMetricas
 
 
 class ErrorProveedorIA(Exception):
@@ -28,6 +29,7 @@ class ProveedorHttp:
         modelo: str,
         timeout_s: float = 8.0,
         http: Optional[httpx.Client] = None,
+        metricas: RegistroMetricas | None = None,
     ) -> None:
         self._url = _url_chat(base_url)
         self._api_key = api_key
@@ -35,6 +37,7 @@ class ProveedorHttp:
         self._timeout_s = timeout_s
         self._propios = http is None
         self._http = http or httpx.Client(timeout=timeout_s)
+        self._metricas = metricas
 
     def close(self) -> None:
         if self._propios:
@@ -59,15 +62,21 @@ class ProveedorHttp:
                 },
             )
         except httpx.TimeoutException as exc:
+            self._registrar_uso(None)
             raise ErrorProveedorIA("timeout") from exc
         except httpx.RequestError as exc:
+            self._registrar_uso(None)
             raise ErrorProveedorIA("conexion") from exc
+        try:
+            data = respuesta.json()
+        except ValueError:
+            data = None
+        self._registrar_uso(data)
         if respuesta.status_code >= 400:
             raise ErrorProveedorIA(f"http_{respuesta.status_code}")
         try:
-            data = respuesta.json()
             contenido = data["choices"][0]["message"]["content"]
-        except (ValueError, KeyError, IndexError, TypeError) as exc:
+        except (KeyError, IndexError, TypeError) as exc:
             raise ErrorProveedorIA("cuerpo_invalido") from exc
         categoria, prioridad = _parsear_json(contenido)
         if not en_catalogo(categoria, prioridad):
@@ -75,6 +84,15 @@ class ProveedorHttp:
         return Clasificacion(
             categoria=categoria, prioridad=prioridad, origen="proveedor"
         )
+
+    def _registrar_uso(self, data: dict | None) -> None:
+        if self._metricas is not None:
+            usage = data.get("usage") if isinstance(data, dict) else None
+            self._metricas.registrar_llamada_ia(
+                "clasificacion",
+                self._modelo,
+                usage,
+            )
 
 
 def _url_chat(base: str) -> str:

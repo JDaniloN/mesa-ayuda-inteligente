@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.configuracion import Configuracion, obtener_configuracion
+from src.metricas import RegistroMetricas
 from src.rag.chunker import fragmentar_documento
 from src.rag.embeddings import EmbeddingsHttp
 from src.rag.extractor import extraer_directorio, hash_documentos
@@ -44,6 +45,7 @@ class ServicioPoliticas:
         embeddings: PuertoEmbeddings | None = None,
         generador: PuertoGenerador | None = None,
         almacen: AlmacenChroma | None = None,
+        metricas: RegistroMetricas | None = None,
     ) -> ServicioPoliticas:
         config = configuracion or obtener_configuracion()
         store = almacen or AlmacenChroma(Path(config.rag_indice_dir))
@@ -56,6 +58,7 @@ class ServicioPoliticas:
                     clave,
                     config.ia_embedding_model,
                     timeout_s=config.ia_timeout,
+                    metricas=metricas,
                 )
         if generador is None:
             clave = config.ia_api_key.get_secret_value().strip()
@@ -66,6 +69,7 @@ class ServicioPoliticas:
                     clave,
                     config.ia_model,
                     timeout_s=config.ia_timeout,
+                    metricas=metricas,
                 )
         return cls(store, embeddings, generador, config.rag_min_score)
 
