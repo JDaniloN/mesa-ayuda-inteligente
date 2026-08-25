@@ -82,5 +82,32 @@ class EstadoSalud(BaseModel):
     clasificador: Literal["proveedor", "sin_clave"]
 
 
+class ConsultaPoliticaEntrada(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "pregunta": "¿Cuál es el tiempo de respuesta de un incidente crítico?",
+                "limite": 4,
+            }
+        }
+    )
+
+    pregunta: str = Field(..., min_length=5, max_length=500)
+    limite: int = Field(default=4, ge=1, le=20)
+
+
+class CitaPolitica(BaseModel):
+    documento: str
+    seccion: str
+    titulo: str
+    pagina: int
+    fragmento_id: str
+
+
+class ConsultaPoliticaSalida(BaseModel):
+    respuesta: str
+    citas: list[CitaPolitica]
+
+
 def ahora_iso() -> str:
     return datetime.now(timezone.utc).isoformat()

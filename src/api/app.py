@@ -1,7 +1,7 @@
-"""API REST propia de la mesa de ayuda (etapa 2).
+"""API REST propia de la mesa de ayuda.
 
-Tres recursos más /health. La clasificación va por src/ia (puerto),
-no por el proveedor HTTP directo.
+Solicitudes, salud y consulta de políticas. La clasificación va por src/ia
+(puerto), no por el proveedor HTTP directo. El RAG vive en src/rag.
 """
 
 from contextlib import asynccontextmanager
@@ -19,9 +19,11 @@ from src.api.errores import error_no_controlado, http_excepcion, validacion_inva
 from src.api.modelos import EstadoSalud, RespuestaError
 from src.api.repositorio import Repositorio
 from src.api.rutas import CABECERA_REQUEST_ID, router
+from src.api.rutas_politicas import router as router_politicas
 from src.configuracion import Configuracion, obtener_configuracion
 from src.ia.fachada import FachadaClasificador
 from src.ia.puerto import PuertoClasificador
+from src.rag.servicio import ServicioPoliticas
 from src.observabilidad import (
     configurar_logging,
     establecer_request_id,
@@ -36,6 +38,7 @@ def create_app(
     repositorio: Repositorio | None = None,
     api_token: str | None = None,
     clasificador: PuertoClasificador | None = None,
+    consultor_politicas: ServicioPoliticas | None = None,
     configuracion: Configuracion | None = None,
 ) -> FastAPI:
     config = configuracion or obtener_configuracion()
@@ -44,6 +47,11 @@ def create_app(
         clasificador
         if clasificador is not None
         else FachadaClasificador.desde_configuracion(config)
+    )
+    consultor_real = (
+        consultor_politicas
+        if consultor_politicas is not None
+        else ServicioPoliticas.desde_configuracion(config)
     )
 
     @asynccontextmanager
@@ -54,19 +62,24 @@ def create_app(
             cerrar = getattr(clasificador_real, "close", None)
             if callable(cerrar):
                 cerrar()
+            cerrar_rag = getattr(consultor_real, "close", None)
+            if callable(cerrar_rag):
+                cerrar_rag()
 
     app = FastAPI(
         title="Mesa de Ayuda Inteligente",
         version="0.2.0",
         description=(
             "API interna para crear, consultar y listar solicitudes de soporte. "
-            "La clasificación usa un proveedor de IA con modo degradado."
+            "La clasificación usa un proveedor de IA con modo degradado. "
+            "Las políticas internas se consultan con RAG y citas verificables."
         ),
         lifespan=lifespan,
     )
     app.state.configuracion = config
     app.state.repositorio = repositorio or Repositorio()
     app.state.clasificador = clasificador_real
+    app.state.consultor_politicas = consultor_real
     if api_token is not None:
         app.state.api_token = api_token
     else:
@@ -132,6 +145,7 @@ def create_app(
     app.add_exception_handler(StarletteHTTPException, http_excepcion)
     app.add_exception_handler(Exception, error_no_controlado)
     app.include_router(router)
+    app.include_router(router_politicas)
 
     @app.get(
         "/health",

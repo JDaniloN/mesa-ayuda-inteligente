@@ -56,11 +56,20 @@ def test_alias_mock_base_url_conserva_compatibilidad(monkeypatch):
         ("ia_reintentos", 4),
         ("api_port", 70000),
         ("log_level", "VERBOSE"),
+        ("rag_min_score", 1.5),
     ],
 )
 def test_configuracion_invalida_falla_claro(campo, valor):
     with pytest.raises(ValidationError):
         Configuracion(_env_file=None, **{campo: valor})
+
+
+def test_rag_min_score_es_configurable_por_entorno(monkeypatch):
+    monkeypatch.setenv("RAG_MIN_SCORE", "0.41")
+
+    config = Configuracion(_env_file=None)
+
+    assert config.rag_min_score == 0.41
 
 
 def test_secretos_no_aparecen_en_representacion():

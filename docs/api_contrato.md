@@ -22,7 +22,7 @@ No se versiona una copia estática de `openapi.json`: quedaría desactualizada.
 
 ## Autenticación
 
-Las rutas bajo `/solicitudes` esperan:
+Las rutas bajo `/solicitudes` y `/politicas` esperan:
 
 ```http
 Authorization: Bearer <API_TOKEN>
@@ -174,6 +174,62 @@ No requiere Bearer.
 prueba saldo, conectividad ni disponibilidad de OpenAI. Si no había clave
 aparece `sin_clave`.
 
+## Consultar políticas internas
+
+```http
+POST /politicas/consultar
+```
+
+Requiere Bearer. Cuerpo:
+
+- `pregunta`: 5–500 caracteres.
+- `limite`: 1–20; valor predeterminado 4. Es el máximo de fragmentos
+  recuperados, no un número de citas inventadas.
+
+```json
+{
+  "pregunta": "¿Cuál es el tiempo de respuesta de un incidente crítico?",
+  "limite": 4
+}
+```
+
+Respuesta `200`:
+
+```json
+{
+  "respuesta": "…",
+  "citas": [
+    {
+      "documento": "POL-TIC-05",
+      "seccion": "4",
+      "titulo": "Tiempos objetivo de atención",
+      "pagina": 1,
+      "fragmento_id": "…"
+    }
+  ]
+}
+```
+
+Las citas se copian de los metadatos del retriever (`codigo`, `seccion`,
+`titulo_seccion`, páginas, `chunk_id`). El generador no puede añadir fuentes
+que no se recuperaron. Si el mejor hit queda bajo `RAG_MIN_SCORE` o no hay
+hits, `respuesta` es el mensaje fijo de abstención y `citas` es `[]`; no se
+llama al LLM.
+
+Otros códigos:
+
+- `401`: Bearer ausente o rechazado.
+- `422`: pregunta o límite fuera del contrato.
+- `500`: fallo inesperado.
+- `503`: falta `API_TOKEN`, embeddings, generador o índice (`python -m src.rag`).
+  No se fabrican vectores.
+
+`RAG_MIN_SCORE` (valor inicial **0.22**) es **provisional**. Se calibra en el
+ítem de abstención; no se trata como umbral de producción. El índice vive en
+`RAG_INDICE_DIR` (`data/salida/rag` por defecto) y no se versiona. El recorte
+`limite` del contrato no cambia; por dentro se puede recuperar un pool mayor
+para partir preguntas compuestas, diversificar y expandir cláusulas hermanas.
+
 ## Proveedor de IA y degradación
 
 El POST envía asunto y descripción como campos JSON separados. El prompt trata
@@ -205,8 +261,9 @@ La precedencia es proceso → `.env` → valores predeterminados. Variables
 principales:
 
 - `API_TOKEN`, `API_HOST`, `API_PORT`.
-- `IA_API_BASE_URL`, `IA_API_KEY`, `IA_MODEL`.
+- `IA_API_BASE_URL`, `IA_API_KEY`, `IA_MODEL`, `IA_EMBEDDING_MODEL`.
 - `IA_TIMEOUT`, `IA_REINTENTOS`.
+- `RAG_MIN_SCORE` (provisional), `RAG_INDICE_DIR`.
 - `APP_ENV`, `LOG_LEVEL`.
 
 Los eventos propios se escriben como JSON a stdout. No se registran
@@ -223,6 +280,8 @@ Los eventos propios se escriben como JSON a stdout. No se registran
 - CORS habilitado únicamente para Angular local, sin cookies, con métodos
   `GET`/`POST` y las cabeceras `Authorization`, `Content-Type` e
   `Idempotency-Key`.
+- `RAG_MIN_SCORE=0.22` es un umbral provisional de abstención, no una
+  calibración medida contra un gold set.
 
 Estas limitaciones son explícitas; no se presentan como capacidades
 productivas.

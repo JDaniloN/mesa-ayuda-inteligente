@@ -6,3 +6,5 @@ pydantic-settings
 fastapi
 uvicorn
 python-dotenv
+pdfplumber
+chromadb

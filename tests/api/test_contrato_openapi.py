@@ -14,13 +14,14 @@ def _openapi() -> dict:
     return app.openapi()
 
 
-def test_contrato_publica_las_cuatro_operaciones():
+def test_contrato_publica_las_operaciones_actuales():
     paths = _openapi()["paths"]
 
     assert set(paths) == {
         "/health",
         "/solicitudes",
         "/solicitudes/{id_solicitud}",
+        "/politicas/consultar",
     }
     assert paths["/health"]["get"]["operationId"] == "consultar_salud"
     assert paths["/solicitudes"]["post"]["operationId"] == "crear_solicitud"
@@ -29,6 +30,14 @@ def test_contrato_publica_las_cuatro_operaciones():
         paths["/solicitudes/{id_solicitud}"]["get"]["operationId"]
         == "consultar_solicitud"
     )
+    assert paths["/politicas/consultar"]["post"]["operationId"] == "consultar_politica"
+    assert set(paths["/politicas/consultar"]["post"]["responses"]) == {
+        "200",
+        "401",
+        "422",
+        "500",
+        "503",
+    }
 
 
 def test_post_documenta_camino_nuevo_idempotente_y_errores():
@@ -76,6 +85,7 @@ def test_respuestas_documentan_header_de_correlacion():
         paths["/solicitudes"]["post"]["responses"]["201"],
         paths["/solicitudes"]["get"]["responses"]["200"],
         paths["/solicitudes/{id_solicitud}"]["get"]["responses"]["200"],
+        paths["/politicas/consultar"]["post"]["responses"]["200"],
     ]
 
     for respuesta in respuestas:

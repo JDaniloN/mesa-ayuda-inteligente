@@ -31,3 +31,6 @@ htmlcov/
 
 # Notebooks
 .ipynb_checkpoints/
+
+# Notas personales de sustentación (no son entrega)
+docs/aclaraciones_sustentacion.md

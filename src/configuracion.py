@@ -36,6 +36,11 @@ class Configuracion(BaseSettings):
     ia_model: str = "gpt-4o-mini"
     ia_timeout: float = Field(default=8.0, gt=0)
     ia_reintentos: int = Field(default=1, ge=0, le=3)
+    ia_embedding_model: str = "text-embedding-3-small"
+
+    # Umbral provisional de abstención RAG; se calibra en el ítem de abstención.
+    rag_min_score: float = Field(default=0.22, ge=0.0, le=1.0)
+    rag_indice_dir: str = "data/salida/rag"
 
     app_env: Literal["development", "test", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
