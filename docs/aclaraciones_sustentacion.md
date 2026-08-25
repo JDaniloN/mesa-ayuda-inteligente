@@ -1,7 +1,6 @@
 # Aclaraciones para la sustentación (uso personal)
 
-**Este archivo no es entrega.** El evaluador y el reclutador solo ven
-`README.md` y los docs listados ahí. Si un hecho, cifra o decisión está
+**Este archivo no corresponde a una entrega. Documento realizado para recorda decisiones tomadas dentro del desarollo, como una auditoria.** El evaluador y el reclutador solo ven `README.md` y los docs listados ahí. Si un hecho, cifra o decisión está
 solo aquí, nadie de afuera lo va a leer. Antes de la sustentación, revisa
 que el README ya cuente la historia oficial.
 
@@ -74,6 +73,8 @@ coincide, pero mide el log, no el estado.
 
 ---
 
+
+
 ## Etapa 1 — Las tres funciones del enunciado
 
 El enunciado pide **tres funciones y un caso de borde**. Función = un `def`
@@ -92,7 +93,7 @@ Si piden un borde en vivo: `test_fecha_invalida_lanza_error` (`32/13/2025`) o
 
 ### 1. `normalizar_fecha`
 
-**Cómo lo digo.** *El enunciado dice tres formatos. No usé `to_datetime` a
+**Cómo lo digo.** *El enunciado dice tres formatos. No usé* `to_datetime` *a
 ciegas porque mezcla día/mes. Cada formato tiene su parser. Vacío no es
 error; “ayer” sí.*
 
@@ -127,7 +128,11 @@ criterio.
 
 ---
 
+
+
 ## Etapa 1 — Otras preguntas fijas
+
+
 
 ### ¿Por qué `reaperturas` vacía no pasa a 0?
 
@@ -156,6 +161,8 @@ valor de prueba está en `materiales/servicio_mock/README.md`.
 `python -m src.integraciones.cliente` arma el JSON en Python.
 
 ---
+
+
 
 ## Etapa 2 — API
 
@@ -198,6 +205,8 @@ que OpenAI tenga saldo: eso se ve en la terminal al clasificar (`http_429`).
 
 ---
 
+
+
 ## Etapa 2 — Clasificador de IA
 
 Pruebas sin red: `python -m pytest tests/ia/ -q`.
@@ -233,11 +242,15 @@ Bearer de la mesa. Terminal `http_401` + POST 201 = clave de OpenAI.
 
 ---
 
+
+
 ## Etapa 2 — Legado
 
 ```
 python -m pytest tests/legacy/ -q
 ```
+
+
 
 ### S1
 
@@ -250,7 +263,7 @@ cambiaría el significado de `fin`.
 ### S2
 
 **Cómo lo digo:** *No era un error de suma; era estado escondido entre
-llamadas. `None` crea una cesta nueva, pero mantuve el acumulador explícito
+llamadas.* `None` *crea una cesta nueva, pero mantuve el acumulador explícito
 para no romper compatibilidad.*
 
 ### S3
@@ -263,7 +276,11 @@ estado después de reabrirse. Un contador vacío no se transforma en `1`.
 
 ---
 
+
+
 ## Etapa 2 — Configuración y logs
+
+
 
 ### Precedencia
 
@@ -276,8 +293,8 @@ producción para ocultarla.
 
 ### Log estructurado
 
-**Cómo lo digo:** *Un texto libre se lee; un JSON también se consulta. El
-`X-Request-ID` de la respuesta es el mismo que acompaña la petición y los
+**Cómo lo digo:** *Un texto libre se lee; un JSON también se consulta. El*
+`X-Request-ID` *de la respuesta es el mismo que acompaña la petición y los
 intentos de IA.*
 
 Stdout, no un `.log`: contenedores recogen stdout. No se serializan
@@ -297,6 +314,8 @@ propósito; no se toca.
 
 ---
 
+
+
 ## Etapa 2 — Documentación de la API
 
 **Cómo lo digo:** *OpenAPI dice cómo integrarse; el documento funcional dice
@@ -309,6 +328,8 @@ normal. No hay `/v1` para no romper consumidores por una necesidad que el
 ejercicio todavía no tiene.
 
 ---
+
+
 
 ## Etapa 2 — Angular opcional
 
@@ -324,13 +345,15 @@ Descartado: crear solicitudes, editar estado, login simulado y dashboard.
 
 ---
 
+
+
 ## Etapa 3 — RAG
 
 **Cómo lo digo:** *El conocimiento vive junto al código de la demo. Si mañana
 el volumen crece, el puerto del almacén se puede sustituir sin cambiar la
 ruta HTTP; no lo hice ahora porque no había incompatibilidad real.*
 
-Sobre el umbral: *El número está a la vista en `.env.example` para poder
+Sobre el umbral: *El número está a la vista en* `.env.example` *para poder
 moverlo. No lo presento como precisión medida. Solo decide si la pregunta
 entera está fuera de dominio; no lo uso para decir si cubrí cada mitad.*
 
@@ -338,9 +361,9 @@ Si cambian PDF o modelo: el sidecar guarda hash, modelo y dimensión. Distintos
 → se borra la colección. Citas solo de metadatos del retriever. Tablas de
 POL-TIC-05: representación clave-valor, sin alterar `materiales/`.
 
-Preguntas de dos hechos: *No subí el `limite` del contrato. Parto la pregunta
+Preguntas de dos hechos: *No subí el* `limite` *del contrato. Parto la pregunta
 con reglas, recupero cada parte, limito hermanas del mismo título y, si entra
-una cláusula `N.M`, puedo traer el vecino. El modelo tiene prohibido copiar
+una cláusula* `N.M`*, puedo traer el vecino. El modelo tiene prohibido copiar
 un plazo de un fragmento a otra parte de la pregunta.*
 
 Descartado: reranker con LLM, HyDE, GraphRAG, otro vector store, vectores
@@ -348,6 +371,8 @@ falsos en producción y penalizar en bloque las FAQ (hundían `POL-GTH-01` §8,
 que era el mejor vector de la consulta de vacaciones).
 
 ---
+
+
 
 ## Etapa 3 — Abstención
 
@@ -363,6 +388,8 @@ Pendiente declarado: calibrar `RAG_MIN_SCORE` con un gold set.
 
 ---
 
+
+
 ## Etapa 3 — CI
 
 **Cómo lo digo:** *En cada envío corro análisis estático crítico y la suite.
@@ -374,6 +401,8 @@ cobertura obligatoria y fallar los `xfail`. Ubuntu + Ruff crítico + `xfail`
 documentados + `demostrar_fallo` en `workflow_dispatch`.
 
 ---
+
+
 
 ## Etapa 3 — Seguridad del código IA
 
@@ -388,16 +417,20 @@ throttling por token.
 
 ---
 
+
+
 ## Etapa 3 — Instrumentación
 
 **Cómo lo digo:** *Cada petición deja latencia. Cada llamada al proveedor
-deja los tokens que él reporta. Si no trae `usage`, marco
-`uso_no_reportado`; no estimo. El resumen es de esta instancia y exige Bearer.*
+deja los tokens que él reporta. Si no trae* `usage`*, marco*
+`uso_no_reportado`*; no estimo. El resumen es de esta instancia y exige Bearer.*
 
 Descartado: Prometheus, estimar con tiktoken y persistir en disco. No es
 facturación; es operación de la demo.
 
 ---
+
+
 
 ## Etapa 3 — Artefacto del equipo
 

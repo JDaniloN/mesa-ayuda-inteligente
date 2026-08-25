@@ -4,10 +4,14 @@ Prueba técnica de nivelación — Familia de cargos IA · LA FORTUNA S.A.
 
 **Nivel objetivo:** Ingeniero IA Middle II.
 
-Este README es la guía de evaluación y el guion del recorrido. Recorre las
-etapas en orden: qué se implementó, cómo probarlo, qué debe aparecer y qué
-sigue pendiente. Un solo README raíz, como pide el enunciado; las etapas 2 a 5
-no abren otro.
+Este README es la guía de evaluación y el recorrido reproducible de la
+implementación. Recorre las etapas en orden: qué se implementó, cómo
+probarlo, qué debe aparecer y qué sigue pendiente. Quien siga Preparación y
+cada etapa debe obtener los mismos resultados documentados aquí. Un solo
+README raíz, como pide el enunciado; las etapas 2 a 5 no abren otro.
+
+Nota: 
+Para Desarrollar e implementar la solucion a cada una de las etapas utilice los modelos de grok 4.5 y chatgpt 5.6 sol ambos en su version high para obtener los mejores resultados posibles, poniendo como objetivo lograr el criterio 4 en cada una de los items que comprendia cada etapa y asi poder culminar de forma eficiente el proyecto dentro de los 3 dias.
 
 ---
 
@@ -74,10 +78,12 @@ uvicorn del mock.
 ```
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 Copy-Item .env.example .env
 ```
 
+`requirements-dev.txt` incluye `requirements.txt` más Ruff (necesario para el
+paso de calidad local y del CI).
 Editar `.env`:
 
 | Variable | Para qué | Dónde se usa |
@@ -573,7 +579,7 @@ de la etapa 2 en `docs/declaracion_uso_ia.md` está completa.
 ## Etapa 3 — Complejidad y calidad
 
 **Estado:** implementación hecha. Los seis ítems de abajo están cerrados;
-el residual del umbral RAG y los tres `xfail` quedan declarados al final.
+el residual del umbral RAG (sin gold set) queda declarado al final.
 
 ### RAG de políticas internas (este ítem)
 
@@ -609,10 +615,14 @@ python -m src.api
 python -m pytest tests/rag/ tests/api/test_politicas.py tests/api/test_contrato_openapi.py -q
 ```
 
-En Swagger, `POST /politicas/consultar` con Bearer. Ejemplos:
+En Swagger (`http://127.0.0.1:8000/docs`), `POST /politicas/consultar` con
+Bearer. Ejemplos mínimos:
 
 ```json
-{ "pregunta": "¿Cuál es el tiempo de respuesta de un incidente crítico?", "limite": 4 }
+{
+  "pregunta": "Tras solucionarse un incidente en la mesa de ayuda, ¿cuánto tiempo tiene el sistema para cerrarlo automáticamente si el usuario no responde, y cuánto tiempo tiene el usuario para reabrirlo si la falla vuelve a presentarse?",
+  "limite": 4
+}
 ```
 
 ```json
@@ -620,8 +630,9 @@ En Swagger, `POST /politicas/consultar` con Bearer. Ejemplos:
 ```
 
 **Qué resultados aparecen.** La ingesta imprime documentos, fragmentos y
-modelo. Una pregunta de contrato (vacaciones, incidentes) responde con citas
-verificables. La pregunta fuera de dominio devuelve:
+modelo. La pregunta de cierre/reapertura responde con plazos (**2** y **5**
+días hábiles) y citas `POL-TIC-05` §7 y §6.1. La pregunta fuera de dominio
+devuelve:
 
 ```
 No encontré información suficiente en las políticas proporcionadas para responder la pregunta.
@@ -630,13 +641,10 @@ No encontré información suficiente en las políticas proporcionadas para respo
 y `citas: []`.
 
 **Qué quedó pendiente de este ítem.** No se sustituye Chroma, no hay reranker
-LLM y `RAG_MIN_SCORE` no está calibrado con un gold set. Tres regresiones en
-`tests/rag/test_consultas_compuestas.py` son `xfail`: con `EmbeddingsFalsos`
-siguen fallando (XFAIL, no XPASS). Con el índice real solo *problema vs
-crítico* cumple §6.3+§5.1; cierre/reapertura recupera §7 pero aún no §6.1.
-Evidencia reproducible: `docs/evidencia_xfail_rag.md`. El texto plano de
-tablas de POL-TIC-05 se omite a favor de una representación clave-valor; no
-se altera `materiales/`.
+LLM y `RAG_MIN_SCORE` no está calibrado con un gold set. Las tres regresiones
+de cierre/reapertura y problema/crítico ya pasan (fake e índice real); detalle
+en `docs/evidencia_xfail_rag.md`. El texto plano de tablas de POL-TIC-05 se
+omite a favor de una representación clave-valor; no se altera `materiales/`.
 
 ### Abstención sin evidencia
 
@@ -663,18 +671,20 @@ instala `requirements-dev.txt`, Ruff (errores críticos) y pytest. El
 después de calidad, sin introducir código inválido.
 
 Evidencia: `docs/evidencia_ci.md`. Local equivalente:
-**Ruff OK; 196 passed, 3 xfailed**. Remotas:
+**Ruff OK; 199 passed**. Remotas (evidencia del diseño verde/rojo; el conteo
+de tests puede ser de un commit anterior al quitar los `xfail`):
 [verde](https://github.com/JDaniloN/mesa-ayuda-inteligente/actions/runs/32885632111)
 y
 [roja](https://github.com/JDaniloN/mesa-ayuda-inteligente/actions/runs/32885796312).
+Tras el próximo push, el job verde debe reflejar **199 passed**.
 
-**Fallos anticipados.** Suite roja por embeddings fake; Ruff estricto que
-bloquearía el repo por estilo; dependencias sin pin; evidencia remota inventada.
+**Fallos anticipados.** Dependencias sin pin; evidencia remota inventada;
+regresión de ranking si se desactiva la calibración léxica.
 
 **Alternativas descartadas.** Matrix multi-OS, cobertura obligatoria, fail-fast
-sobre `xfail`, y “romper” un test real para el camino rojo. Se eligió un solo
-runner Ubuntu, reglas críticas de Ruff, `xfail` documentados y un paso final
-condicional para demostrar el rojo sin contaminar la rama.
+agresivo, y “romper” un test real para el camino rojo. Se eligió un solo
+runner Ubuntu, reglas críticas de Ruff y un paso final condicional para
+demostrar el rojo sin contaminar la rama.
 
 ### Seguridad del código asistido por IA
 
@@ -732,7 +742,8 @@ aplicadas, métricas de latencia/tokens y estándar de revisión de código IA.
 
 Cada ítem declara fallos anticipados, alternativas descartadas y riesgos
 residuales. Residual explícito del RAG: `RAG_MIN_SCORE` es provisional (sin
-gold set) y tres rankings quedan como `xfail` (detalle en `docs/evidencia_xfail_rag.md`).
+gold set). Los tres rankings de cierre/reapertura y problema/crítico ya
+pasan; evidencia en `docs/evidencia_xfail_rag.md`.
 
 **Qué quedó pendiente.** Nada de esta etapa para la declaración: la tabla
 de la etapa 3 en `docs/declaracion_uso_ia.md` está completa. La calibración
@@ -789,8 +800,9 @@ descartó (n8n, cola asíncrona, vectores en SQL, etc.), no solo qué se eligió
 
 ### Orquestación (demo mínima)
 
-**Qué se hizo.** Aún no (fase 2). El paquete `src/orquestacion/` está reservado.
-El flujo a demostrar, aunque sea parcial:
+**Qué se hizo.** Aún no (fase 2). El paquete `src/orquestacion/` existe como
+reserva (`__init__.py` vacío); no hay demo ejecutable ni
+`tests/orquestacion/`. El flujo a demostrar, aunque sea parcial:
 
 1. Clasificar la solicitud (`src/ia/`).
 2. Consultar el RAG (`src/rag/` / `POST /politicas/consultar`).
@@ -1035,8 +1047,10 @@ límites de fecha, N+1, mezcla de responsabilidades) y tres reglas de equipo
 que se puedan aplicar en el siguiente PR.
 
 **Qué quedó pendiente.** La revisión escrita y el estándar. El video de
-recorrido (máximo 5 min: qué se construyó, hasta qué etapa, dos decisiones,
-qué se haría distinto) se graba al cerrar la entrega.
+recorrido (máximo 5 min), al cerrar la entrega, sigue este README en orden
+(Estado → Preparación → etapas 0–3 implementadas; etapa 4 solo diseño; etapa
+5 solo plan): qué se construyó, cómo reproducirlo, qué resultados aparecen y
+qué quedó pendiente. No hay guion aparte.
 
 ### Cierre de la etapa 5
 
@@ -1061,7 +1075,7 @@ src/
   ia/                categoría y prioridad, desacoplado
   legacy/            copia corregida del módulo heredado
   rag/               políticas, citas y abstención
-  orquestacion/      clasificar → consultar → responder → escalar (etapa 4)
+  orquestacion/      reserva etapa 4 (stub; demo aún no implementada)
 tests/               mismo mapa que src/; evaluacion/ en la etapa 5
 sql/                 consultas de la etapa 1 y runner
 docs/                declaración IA, contrato, funcional, legado, CI,

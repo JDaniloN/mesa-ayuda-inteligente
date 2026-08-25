@@ -12,15 +12,15 @@ Ejecución local de los mismos pasos del job `calidad`, 2026-08-25:
 All checks passed!
 
 > python -m pytest -q
-196 passed, 3 xfailed, 1 warning in 61.34s
+199 passed, 1 warning in ~60s
 Exit code: 0
 ```
 
-Los tres `xfail` están en `tests/rag/test_consultas_compuestas.py`. Con
-`EmbeddingsFalsos` siguen fallando (XFAIL, no XPASS). El contraste con el
-índice real y los asserts exactos está en `docs/evidencia_xfail_rag.md`: solo
-*problema vs crítico* pasa hoy con OpenAI; cierre/reapertura aún no ancla
-§6.1. No llaman a OpenAI en CI y no ocultan una excepción de producción.
+Los tres rankings de cierre/reapertura y problema/crítico que antes eran
+`xfail` pasan tras la calibración del retriever (`docs/evidencia_xfail_rag.md`).
+Las URLs remotas más abajo demuestran el camino verde/rojo; el conteo de
+aquellas corridas puede diferir del local actual (**199 passed**) hasta el
+próximo push. No llaman a OpenAI en CI y no ocultan una excepción de producción.
 
 ## Camino fallido controlado
 
@@ -55,9 +55,9 @@ no por un test productivo roto.
 
 - Ruff solo con `E9,F63,F7,F82`: evita fallar el pipeline por estilo heredado.
 - Un runner Ubuntu: Chroma y pdfplumber son más estables ahí que en matrix.
-- Tres `xfail` documentados: ver `docs/evidencia_xfail_rag.md` (fake vs real).
+- Calibración RAG documentada en `docs/evidencia_xfail_rag.md` (ex-`xfail`).
 - Camino rojo con `demostrar_fallo`: no se rompe un test productivo para la
   evidencia.
 
-Descartado: cobertura obligatoria, fail-fast sobre `xfail`, y fingir URLs
+Descartado: cobertura obligatoria, fail-fast agresivo, y fingir URLs
 remotas con salidas locales.
