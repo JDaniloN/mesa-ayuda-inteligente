@@ -15,8 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.api.errores import error_no_controlado, http_excepcion, validacion_invalida
+from src.api.modelos import EstadoSalud, RespuestaError
 from src.api.repositorio import Repositorio
-from src.api.rutas import router
+from src.api.rutas import CABECERA_REQUEST_ID, router
 from src.configuracion import Configuracion, obtener_configuracion
 from src.ia.fachada import FachadaClasificador
 from src.observabilidad import (
@@ -40,7 +41,10 @@ def create_app(
     app = FastAPI(
         title="Mesa de Ayuda Inteligente",
         version="0.2.0",
-        description="API propia: crear, consultar y listar solicitudes.",
+        description=(
+            "API interna para crear, consultar y listar solicitudes de soporte. "
+            "La clasificación usa un proveedor de IA con modo degradado."
+        ),
     )
     app.state.configuracion = config
     app.state.repositorio = repositorio or Repositorio()
@@ -113,7 +117,27 @@ def create_app(
     app.add_exception_handler(Exception, error_no_controlado)
     app.include_router(router)
 
-    @app.get("/health", summary="Estado del servicio")
+    @app.get(
+        "/health",
+        response_model=EstadoSalud,
+        operation_id="consultar_salud",
+        summary="Estado del servicio",
+        description=(
+            "Indica si el proceso está operativo y si arrancó con proveedor "
+            "de clasificación configurado. No requiere autenticación."
+        ),
+        responses={
+            200: {
+                "description": "Estado del proceso y del clasificador.",
+                "headers": CABECERA_REQUEST_ID,
+            },
+            500: {
+                "model": RespuestaError,
+                "description": "Fallo inesperado del servicio.",
+                "headers": CABECERA_REQUEST_ID,
+            },
+        },
+    )
     def health():
         tiene = getattr(app.state.clasificador, "_proveedor", None) is not None
         return {

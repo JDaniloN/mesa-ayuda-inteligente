@@ -26,8 +26,8 @@ Un solo README raíz, como pide el enunciado: hasta qué etapa llegué y dónde 
 | Etapa | Documento | Estado |
 |---|---|---|
 | 0–1 | `docs/declaracion_uso_ia.md` | Etapa 0 llena a mano; etapa 1 pendiente |
-| 1–2 | `docs/aclaraciones_sustentacion.md` | Hecho (SQL, mock, API, clasificador IA) |
-| 2 | Contrato de la API + doc funcional (qué resuelve y para quién) | Pendiente |
+| 1–2 | `docs/aclaraciones_sustentacion.md` | Hecho (SQL, mock, API, IA, legado, configuración) |
+| 2 | `docs/api_contrato.md` + `docs/api_funcional.md` | Hecho |
 | 3 | Guía breve de prompts, commits o revisión de código generado por IA | Pendiente |
 | 4 | Arquitectura, flujo extremo a extremo y tres ADR | Pendiente |
 | 5 | Decisión IA vs automatización, métricas previas, revisión del PR | Pendiente |
@@ -43,7 +43,7 @@ Etapa 0 hecha. Etapa 1: CSV, mock y SQL cerrados. Falta llenar a mano la declara
 |---|---|---|
 | Hecha | 0. Contextualización | Enunciado, materiales y alcance Middle II |
 | En curso | 1. Fundamentos | Limpieza del CSV, cliente del mock y tres consultas SQL |
-| En curso | 2. Autonomía e integración | API propia, IA y legado. Falta Angular y cerrar la documentación de la etapa |
+| En curso | 2. Autonomía e integración | API, IA, legado, configuración y documentación. Falta Angular |
 | Pendiente | 3. Complejidad y calidad | RAG, abstención, CI, seguridad |
 | Pendiente | 4. Arquitectura y orquestación | Diseño, ADR y demo mínima |
 | Pendiente | 5. Estrategia y evaluación | Decisión, métricas previas, ML clásico |
@@ -70,6 +70,8 @@ El README de esta etapa cubre lo que pide el enunciado: **cómo instalar, cómo 
 | 2 | Clasificador IA (puerto + HTTP + degradado) | `src/ia/` | `python -m pytest tests/ia/` |
 | 2 | Correcciones S1–S3 del legado | `src/legacy/` y `docs/legacy_causas.md` | `python -m pytest tests/legacy/` |
 | 2 | Configuración tipada y logs JSON | `src/configuracion.py` y `src/observabilidad.py` | `python -m pytest tests/configuracion/ tests/observabilidad/` |
+| 2 | Contrato técnico de la API | `docs/api_contrato.md` | `/docs`, `/openapi.json` y `python -m pytest tests/api/test_contrato_openapi.py` |
+| 2 | Descripción funcional de la API | `docs/api_funcional.md` | Contrastar escenarios con `tests/api/` |
 | 2–5 | IA, RAG, orquestación, ADR | `src/`, `tests/`, `docs/`, `ci/` | Pendiente al cerrar cada etapa |
 | Todas | Paquete original (solo lectura) | `materiales/` | No se modifica |
 
@@ -219,6 +221,8 @@ Tres archivos sobre `esquema.sql` (120 tickets; **otro dataset** que el CSV):
 
 Tres recursos: crear (`POST /solicitudes`), consultar estado (`GET /solicitudes/{id}`), listar con filtros (`GET /solicitudes`). `GET /health` como el mock (sin token, `estado: operativo`) más `clasificador` (`proveedor` / `sin_clave`) para no confundir “servicio arriba” con “LLM configurado”. Validación Pydantic, códigos 201/200/401/404/409/422/503 y error uniforme `{ "error": { "codigo", "mensaje" } }`. Listado sin coincidencias: **200** `[]`, no 404. Clasificación: LLM (catálogo cerrado de la limpieza) o degradado `Sin clasificar`/`Media` si el proveedor falla; el POST no pasa a 500.
 
+El contrato ejecutable vive en `/openapi.json` y Swagger `/docs`; `tests/api/test_contrato_openapi.py` evita que rutas, códigos o esquemas se separen del comportamiento. `docs/api_contrato.md` explica integración, idempotencia y límites. `docs/api_funcional.md` explica qué resuelve, para quién y qué queda fuera.
+
 ### Módulo heredado (etapa 2)
 
 El original queda intacto en `materiales/legacy/legacy_module.py`. La copia de `src/legacy/` corrige únicamente los tres defectos reportados: incluye ambos extremos del período, evita compartir el acumulador entre llamadas y cuenta tickets reabiertos por el hecho histórico (`reaperturas > 0`), no por el estado actual. Las mismas regresiones fallaron con la copia original y pasan con las correcciones; causas y alternativas están en `docs/legacy_causas.md`.
@@ -263,6 +267,8 @@ El original queda intacto en `materiales/legacy/legacy_module.py`. La copia de `
 
 **API — secretos.** Bearer `API_TOKEN`, distinto de `MOCK_TOKEN`. Viven en `.env` (no en el repo; el contrato es `.env.example`). Sin token configurado: 503, no un 401 ambiguo. `Idempotency-Key`: misma clave y mismo cuerpo → 200 y el mismo id; otro cuerpo → 409.
 
+**API — documentación.** OpenAPI se genera desde rutas y modelos y se fija con pruebas; no se versiona otro `openapi.json` que pueda quedar obsoleto. Markdown añade decisiones técnicas y contexto funcional sin copiar todo el esquema. Se mantiene la URL sin `/v1` para no romper la prueba; una ruptura futura deberá introducir una ruta versionada.
+
 **IA — desacople.** La API llama `clasificar` (`PuertoClasificador`), no a OpenAI. Así se inyecta un fijo en pruebas y mañana se cambia de proveedor sin tocar `src/api/`. Alternativa descartada: pegar `httpx` en la ruta del POST.
 
 **IA — contrato HTTP.** `/v1/chat/completions` (OpenAI y compatibles: Groq, modelo local). Timeout **8 s** (el mock eran 5 s: latencia máxima 2,5 s; un chat tarda más en el primer token). Un reintento ante cualquier fallo del proveedor; si el segundo también falla → degradado. Alternativa descartada: reintentar solo 429 (un 500 transitorio también merece un segundo tiro; un 401 se gasta una llamada de más, se acepta por no ramificar).
@@ -293,8 +299,8 @@ El original queda intacto en `materiales/legacy/legacy_module.py`. La copia de `
 
 **Etapa 1 aún abierta.** Declaración de uso de IA de esta etapa, a mano, en `docs/declaracion_uso_ia.md`.
 
-**API (cerrada en este ítem).** Contrato OpenAPI largo en `docs/api_contrato.md` (siguiente documentación). Persistencia.
+**API.** Persistencia, cambio de estado, autenticación corporativa, permisos por rol y paginación por cursor.
 
 **IA.** No hay regex de categoría. No se versiona `IA_API_KEY`. No se usa Assistants ni streaming. Un modelo local o Groq caben cambiando `IA_API_BASE_URL`; no van en este entregable.
 
-**Etapa 2 (resto).** Angular y documentación técnica/funcional.
+**Etapa 2 (resto).** Pantalla Angular opcional con listado y filtros.

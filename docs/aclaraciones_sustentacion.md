@@ -373,3 +373,43 @@ trae un patrón tipo `sk-proj-…` dentro de
 `materiales/revision/pr_para_revision.diff` como parte del PR defectuoso que
 se revisará al final. No es una clave copiada desde `.env`, no se utiliza y el
 material original no se modifica.
+
+---
+
+## Documentación técnica y funcional (etapa 2)
+
+### ¿Por qué no basta Swagger?
+
+Swagger permite ejecutar el contrato y muestra restricciones, pero no explica
+por qué un listado vacío es 200, qué implica el almacenamiento en memoria ni
+qué problema resuelve para la mesa. `docs/api_contrato.md` completa las
+decisiones técnicas y `docs/api_funcional.md` habla al negocio.
+
+**Cómo lo digo:** *OpenAPI dice cómo integrarse; el documento funcional dice
+para qué vale. Si mezclo ambos, el desarrollador no encuentra códigos y el
+negocio recibe detalles de cabeceras que no necesita.*
+
+### ¿Por qué no guardaste `openapi.json` en el repositorio?
+
+Sería una segunda copia del contrato y podría quedar vieja. FastAPI lo genera
+desde modelos y rutas; `test_contrato_openapi.py` fija rutas, Bearer, esquemas,
+códigos 200/201/401/409/422/500/503 y `X-Request-ID`.
+
+### ¿Por qué el POST documenta 201 y 200?
+
+`201` crea un recurso. `200` devuelve el recurso ya existente cuando se repite
+la misma `Idempotency-Key` con el mismo cuerpo. Documentar solo 201 ocultaría
+un camino normal del cliente; documentar solo 200 ocultaría la creación.
+
+### ¿Por qué no hay `/v1`?
+
+La API ya se había probado sin prefijo y cambiarla rompería consumidores por
+una necesidad que el ejercicio todavía no tiene. La versión `0.2.0` queda en
+OpenAPI. Una ruptura futura deberá introducir una ruta versionada, no cambiar
+silenciosamente este contrato.
+
+### ¿Qué admite honestamente la documentación funcional?
+
+La API registra, clasifica, consulta y lista. Todavía no persiste al reiniciar,
+no cambia estados, no asigna agentes y usa un Bearer compartido. Es una
+demostración integrable, no un producto listo para producción.
