@@ -53,7 +53,10 @@ def test_fail_vacaciones_recupera_anticipacion_y_habiles(tmp_path):
 
 
 @pytest.mark.xfail(
-    reason="El doble léxico no reproduce el ranking del índice real ya validado.",
+    reason=(
+        "Fake: no trae POL-TIC-05 §7+§6.1. Índice real: trae §7 pero aún no §6.1 "
+        "(ver docs/evidencia_xfail_rag.md)."
+    ),
     strict=False,
 )
 def test_fail_cierre_y_reapertura(tmp_path):
@@ -85,7 +88,10 @@ def test_pass_comision_autorizacion_anticipo_emergencia(tmp_path):
 
 
 @pytest.mark.xfail(
-    reason="El doble léxico no reproduce el ranking del índice real ya validado.",
+    reason=(
+        "Fake: no trae POL-TIC-05 §6.3+§5.1. Índice real sí los trae "
+        "(ver docs/evidencia_xfail_rag.md)."
+    ),
     strict=False,
 )
 def test_pass_problema_vs_critico(tmp_path):
@@ -199,7 +205,10 @@ def test_expansion_hurto_agrega_hermano_5_1(tmp_path):
 
 
 @pytest.mark.xfail(
-    reason="El doble léxico no reproduce el ranking del índice real ya validado.",
+    reason=(
+        "Fake e índice real: coverage de subconsultas puede ir en True, pero "
+        "hits direct no anclan §7+§6.1 juntos (ver docs/evidencia_xfail_rag.md)."
+    ),
     strict=False,
 )
 def test_multiquery_cierre_cubre_ambas_subconsultas(tmp_path):
