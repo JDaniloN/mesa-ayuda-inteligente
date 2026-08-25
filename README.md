@@ -19,7 +19,7 @@ README raíz, como pide el enunciado; las etapas 2 a 5 no abren otro.
 5. [Etapa 2](#etapa-2--autonomía-e-integración) — API, IA, legado, config, Angular.
 6. [Etapa 3](#etapa-3--complejidad-y-calidad) — RAG, abstención, CI, seguridad, métricas y artefacto cerrados.
 7. [Etapa 4](#etapa-4--arquitectura-y-orquestación) — base documentada; implementación pendiente.
-8. [Etapa 5](#etapa-5--estrategia-y-evaluación) — base documentada; implementación pendiente.
+8. [Etapa 5](#etapa-5--estrategia-y-evaluación) — plan fase 1 listo para revisión; implementación pendiente.
 9. [Mapa del código](#mapa-del-código)
 
 `materiales/` es el paquete original. No se modifica.
@@ -712,8 +712,14 @@ sobre el diseño y las decisiones**, no sobre el sistema completo. Basta una
 demostración mínima del flujo, aunque sea parcial. Si la orquestación llega a
 funcionar de punta a punta, se reconoce en escalabilidad.
 
-Cada ítem de abajo es la base: dónde vivirá, cómo se probará y qué debe
-aparecer. Todavía no hay documento ni demo.
+**Método de esta entrega.** Dos fases:
+
+1. Fase 1 — plan documental: paso a paso y control de errores (criterio 4)
+   por ítem → `docs/etapa4_fase1_plan.md` (**listo para revisión**).
+2. Fase 2 — tu retroalimentación + cierre de entregables
+   (`arquitectura.md`, ADR, demo mínima acordada).
+
+Cada ítem de abajo es la base prevista. El detalle operativo está en el plan.
 
 ### Documento de arquitectura y tres ADR
 
@@ -846,8 +852,15 @@ modelo clásico puede ser un cuaderno con línea base y matriz de confusión,
 sin integrarlo a la API. Las métricas deben quedar en Git **antes** de
 implementar la suite de evaluación.
 
+**Método de esta entrega.** Igual que etapa 4, en dos fases:
+
+1. Fase 1 — plan documental: paso a paso y control de errores por ítem →
+   `docs/etapa5_fase1_plan.md` (**listo para revisión**).
+2. Fase 2 — tu retroalimentación + entregables en orden Git (métricas/gold
+   antes que la suite).
+
 El video de 5 min y la revisión de `pr_para_revision.diff` van con la entrega,
-no ocupan la sesión en vivo.
+no ocupan la sesión en vivo. El detalle operativo de cada ítem está en el plan.
 
 ### Documento de decisión (R-01, R-02, R-03)
 
