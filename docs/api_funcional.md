@@ -13,6 +13,8 @@ La API ofrece un único punto para:
 2. Proponer categoría y prioridad automáticamente.
 3. Entregar un identificador para consultar el caso.
 4. Permitir que la mesa liste y filtre la carga recibida.
+5. Consultar políticas internas con respuesta citada o abstención explícita.
+6. Consultar latencia y consumo de tokens agregados para operar la demo.
 
 ## Para quién
 
@@ -42,6 +44,15 @@ muestra la bandeja, aplica filtros y representa carga, vacío y fallos.
 5. La API responde `201` con identificador, clasificación y su origen.
 6. La mesa puede consultarla o encontrarla en el listado.
 
+## Consulta de políticas
+
+Un agente o una integración pregunta en lenguaje natural. El servicio recupera
+fragmentos de los PDF internos, genera una respuesta acotada a ese contexto y
+devuelve citas verificables (documento, sección, título, página). Si no hay
+evidencia suficiente, se abstiene con un mensaje fijo y sin citas: no improvisa
+plazos ni artículos. El umbral `RAG_MIN_SCORE` (inicialmente 0.22) es
+provisional y se calibra en el criterio de abstención.
+
 ## Continuidad cuando falla la IA
 
 Registrar el caso es más importante que clasificarlo automáticamente. Si el
@@ -53,6 +64,15 @@ proveedor de IA no responde, la solicitud se crea igualmente con:
 
 Esto permite que un agente la revise después. El sistema no presenta esa
 clasificación como si proviniera del modelo.
+
+## Métricas operativas
+
+Cada petición registra latencia y estado sin guardar su cuerpo. Cada llamada
+al proveedor agrega los tokens que este reporta para clasificación, embeddings
+o generación RAG. Un operador autenticado consulta el resumen en
+`GET /metricas/resumen`. Los contadores pertenecen a la instancia actual y se
+reinician al arrancar; no son facturación ni sustituyen la consola del
+proveedor.
 
 ## Reglas funcionales
 
@@ -68,6 +88,8 @@ clasificación como si proviniera del modelo.
 - Los filtros actuales requieren coincidencia exacta.
 - Cada respuesta entrega un identificador de seguimiento técnico
   `X-Request-ID`.
+- Una consulta de políticas o bien cita fragmentos recuperados, o se abstiene;
+  no mezcla fuentes inventadas.
 
 ## Escenarios esperados
 
@@ -96,6 +118,11 @@ La API crea la solicitud y marca `origen_clasificacion=degradado`.
 
 La bandeja devuelve `200` y `[]`; no se interpreta como ruta inexistente.
 
+### Pregunta fuera de las políticas
+
+`POST /politicas/consultar` con «¿Cuál es la capital de Japón?» se abstiene:
+mensaje fijo, `citas: []`, sin llamada al generador.
+
 ## Beneficio esperado
 
 - Menos trabajo manual al recibir casos.
@@ -104,6 +131,7 @@ La bandeja devuelve `200` y `[]`; no se interpreta como ruta inexistente.
 - Menos duplicados causados por reintentos del cliente.
 - Un contrato único para la interfaz y otras integraciones.
 - Errores comprensibles y rastreables mediante `X-Request-ID`.
+- Latencia y consumo de IA visibles sin exponer datos personales.
 
 Estos beneficios son hipótesis funcionales. Su impacto deberá medirse con
 datos reales antes de afirmar reducción de tiempos o aumento de precisión.
@@ -117,6 +145,7 @@ datos reales antes de afirmar reducción de tiempos o aumento de precisión.
 - Búsqueda parcial, paginación por cursor o reportes.
 - Revisión humana asistida de los casos degradados.
 - Integración con el sistema corporativo de tickets.
+- Calibración de `RAG_MIN_SCORE` con un conjunto gold y métricas de retrieval.
 
 Estas exclusiones evitan confundir la demostración técnica con un producto
 listo para producción.
@@ -131,3 +160,5 @@ listo para producción.
 - Una entrada inválida conserva el formato uniforme de error.
 - La caída del proveedor no impide registrar el caso.
 - Ninguna respuesta o log expone credenciales.
+- Una pregunta cubierta por las políticas cita documento y sección.
+- Una pregunta fuera de dominio se abstiene y no inventa citas.

@@ -25,13 +25,13 @@ Validé y entendí el problema y el reto antes de desarrollar.
 Pendiente.
 
 
-| Pregunta                                        | Respuesta |
-| ----------------------------------------------- | --------- |
-| ¿Qué herramientas usaste y para qué?            |           |
-| ¿Qué generaste y conservaste tal cual?          |           |
-| ¿Qué generaste, tuviste que corregir y por qué? |           |
-| ¿Qué decidiste escribir a mano y por qué?       |           |
-| ¿Cómo verificaste lo generado?                  |           |
+| Pregunta                                        | Respuesta            |
+| ----------------------------------------------- | -------------------- |
+| ¿Qué herramientas usaste y para qué?            | Usé Cursor en el IDE |
+| ¿Qué generaste y conservaste tal cual?          |                      |
+| ¿Qué generaste, tuviste que corregir y por qué? |                      |
+| ¿Qué decidiste escribir a mano y por qué?       |                      |
+| ¿Cómo verificaste lo generado?                  |                      |
 
 
 
@@ -41,13 +41,13 @@ Pendiente.
 Pendiente.
 
 
-| Pregunta                                        | Respuesta |
-| ----------------------------------------------- | --------- |
-| ¿Qué herramientas usaste y para qué?            |           |
-| ¿Qué generaste y conservaste tal cual?          |           |
-| ¿Qué generaste, tuviste que corregir y por qué? |           |
-| ¿Qué decidiste escribir a mano y por qué?       |           |
-| ¿Cómo verificaste lo generado?                  |           |
+| Pregunta                                        | Respuesta            |
+| ----------------------------------------------- | -------------------- |
+| ¿Qué herramientas usaste y para qué?            | Usé Cursor en el IDE |
+| ¿Qué generaste y conservaste tal cual?          |                      |
+| ¿Qué generaste, tuviste que corregir y por qué? |                      |
+| ¿Qué decidiste escribir a mano y por qué?       |                      |
+| ¿Cómo verificaste lo generado?                  |                      |
 
 
 
@@ -57,13 +57,13 @@ Pendiente.
 Pendiente.
 
 
-| Pregunta                                        | Respuesta |
-| ----------------------------------------------- | --------- |
-| ¿Qué herramientas usaste y para qué?            |           |
-| ¿Qué generaste y conservaste tal cual?          |           |
-| ¿Qué generaste, tuviste que corregir y por qué? |           |
-| ¿Qué decidiste escribir a mano y por qué?       |           |
-| ¿Cómo verificaste lo generado?                  |           |
+| Pregunta                                        | Respuesta                                            |
+| ----------------------------------------------- | ---------------------------------------------------- |
+| ¿Qué herramientas usaste y para qué?            | Usé Cursor en el IDEUsé ChatGPTUsé Gemini Notebook |
+| ¿Qué generaste y conservaste tal cual?          |                                                      |
+| ¿Qué generaste, tuviste que corregir y por qué? |                                                      |
+| ¿Qué decidiste escribir a mano y por qué?       |                                                      |
+| ¿Cómo verificaste lo generado?                  |                                                      |
 
 
 

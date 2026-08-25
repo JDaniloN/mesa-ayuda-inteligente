@@ -9,6 +9,7 @@ from src.configuracion import Configuracion, obtener_configuracion
 from src.ia.degradado import clasificar_degradado
 from src.ia.modelos import Clasificacion
 from src.ia.proveedor_http import ErrorProveedorIA, ProveedorHttp
+from src.metricas import RegistroMetricas
 
 log = logging.getLogger("mesa.ia")
 
@@ -51,6 +52,7 @@ class FachadaClasificador:
     def desde_configuracion(
         cls,
         configuracion: Configuracion | None = None,
+        metricas: RegistroMetricas | None = None,
     ) -> FachadaClasificador:
         config = configuracion or obtener_configuracion()
         url = config.ia_api_base_url.strip()
@@ -64,6 +66,7 @@ class FachadaClasificador:
                 clave,
                 modelo,
                 timeout_s=config.ia_timeout,
+                metricas=metricas,
             ),
             reintentos=config.ia_reintentos,
         )
