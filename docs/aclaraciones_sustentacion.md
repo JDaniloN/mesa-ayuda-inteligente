@@ -41,6 +41,14 @@ Una fila por cada área del catálogo (LEFT JOIN desde `areas`).
 
 Lectura: 8 áreas, 120 tickets en total. Operaciones es la que más reabre (promedio 0.94). Calidad casi no (0.09) y ninguna de sus 11 está cerrada.
 
+**`COALESCE` (no cambia estas 8 filas).** `LEFT JOIN` hace que un área sin tickets **aparezca**. `COUNT` de cero filas es 0; `SUM` y `AVG` son `NULL`. `COALESCE(..., 0)` deja ceros, no huecos. En este esquema las 8 áreas tienen tickets: el resultado es el mismo. El borde se ve en `test_agregacion_area_sin_tickets_no_desaparece` (inserta `Área sin carga`).
+
+**Cómo lo digo:** *El JOIN evita que el área desaparezca. El COALESCE evita que el indicador quede nulo. Son dos fallos distintos. En este catálogo no se nota; el día que den de alta un área sin tickets, el dashboard no muestra “vacío”.*
+
+**Qué descarté.** Dejar `NULL` y documentarlo: un promedio nulo no es “cero reaperturas”, es “no hay dato”. Aquí el negocio pide conteo por área, no un nulo. `IFNULL` es de MySQL; `COALESCE` es SQL estándar.
+
+**Si piden quitarlo en vivo.** Se quitan las dos llamadas a `COALESCE` en `sql/01_agregacion_por_area.sql`. Las 8 filas no cambian. Hay que ajustar el test del área fantasma: `no_cerrados` y `reaperturas_promedio` pasarían a `None`.
+
 ### 02 — Join de tres tablas (120 filas)
 
 `tickets` + `usuarios` + `areas`. Muestra: código, asunto, estado, prioridad, fecha, nombre y correo del solicitante, si el usuario está activo, área y sede.
@@ -143,6 +151,10 @@ Si piden “muéstrame un borde en vivo”: `test_fecha_invalida_lanza_error` (`
 
 ## Otras preguntas fijas (etapa 1)
 
+### ¿Por qué `COALESCE` en la consulta 01?
+
+Porque `LEFT JOIN` y `SUM`/`AVG` no arreglan lo mismo. El join saca el área; `COUNT` ya da 0; `SUM` y `AVG` de cero filas dan `NULL`. `COALESCE(..., 0)` pone ceros. En las 8 filas actuales no se ve: todas las áreas tienen tickets. La prueba inserta un área vacía. No usé `IFNULL`: no es SQL estándar.
+
 ### ¿Por qué no filtraste `estado = 'Reabierto'`?
 
 Porque eso es la foto de hoy, no el hecho. *Reabierto es un estado; reaperturas es un hecho. Pregunté por el hecho. El historial solo aporta la fecha, y si el log está incompleto no borro el ticket.*
@@ -189,4 +201,308 @@ Execute **no manda** la cabecera `authorization` (Swagger la trata como reservad
 
 ### ¿Dónde está el token?
 
-Solo en `MOCK_TOKEN`. No va en el repo. El valor de prueba está en `materiales/servicio_mock/README.md`.
+En `.env` como `MOCK_TOKEN` (el contrato está en `.env.example`). No va en el repo. El valor de prueba está en `materiales/servicio_mock/README.md`.
+
+---
+
+## API propia (etapa 2)
+
+OpenAPI: `http://127.0.0.1:8000/docs`. Token: `API_TOKEN` de `.env` (no el del mock ni la de OpenAI). Candado **Authorize**. Arranque: `python -m uvicorn src.api.app:app --port 8000` (sin `$env:`).
+
+### ¿Por qué `.env` y no variables en la terminal?
+
+El evaluador ve `.env.example` (contrato, sin secretos). `.env` no se sube.
+Una variable del proceso gana sobre el archivo, como requieren CI, Docker y
+producción. Si quedó un `$env:` viejo en PowerShell se elimina antes de arrancar;
+no se invierte la precedencia para ocultar ese error local.
+
+### ¿Por qué el listado vacío es 200 y no 404?
+
+`GET /solicitudes?area=Vacaciones` es un **filtro sobre la colección**. Cero filas es un resultado válido: **200** `[]`. `GET /solicitudes/SOL-NOEXISTE` es **un recurso**: **404** `no_encontrado`.
+
+**Cómo lo digo:** *404 es “esta solicitud no existe”. 200 vacío es “no hay ninguna que cumpla el filtro”. Si el listado devolviera 404, el tablero vacío se confundiría con una ruta rota.*
+
+Vacaciones es categoría, no área. Filtrar `prioridad=Alta` da `[]` si el LLM no asignó Alta (el degradado deja Media).
+
+### ¿Por qué FastAPI y no Flask?
+
+OpenAPI y validación salen del contrato Pydantic. Flask habría sido más código para el mismo 422.
+
+### ¿Por qué memoria y no SQLite?
+
+El enunciado de este ítem pide recursos y códigos, no el modelo relacional (etapa 4). Al reiniciar se pierde el listado; está declarado.
+
+### ¿Por qué comprobar idempotencia antes de llamar a IA?
+
+La idempotencia no es solo “no duplicar filas”. Si un cliente reintenta por un
+timeout y la API vuelve a consultar al modelo, repite costo, latencia y una
+operación externa aunque termine devolviendo el mismo ticket. Por eso una clave
+existente se resuelve primero. Un bloqueo por clave cubre solicitudes
+simultáneas sin frenar claves distintas; el repositorio vuelve a validar el
+cuerpo bajo candado.
+
+**Cómo lo digo:** *El estado final ya era idempotente; ahora también lo es el
+efecto costoso de clasificación.*
+
+### ¿Por qué 503 si falta API_TOKEN?
+
+Sin secreto configurado el servicio no está listo. Un 401 haría pensar que el cliente se equivocó de token.
+
+### `/health`
+
+Como el mock: sin token, `estado: operativo`. No usa etiqueta `salud`. Extra: `clasificador` (`proveedor` si al arranque había URL y clave, `sin_clave` si no). No prueba que OpenAI tenga saldo: eso se ve en la terminal al clasificar (`http_429`).
+
+---
+
+## Clasificador de IA (etapa 2)
+
+La API no habla con OpenAI: llama `clasificar`. El HTTP vive en `src/ia/proveedor_http.py`. Pruebas sin red: `python -m pytest tests/ia/ -q`.
+
+### ¿Por qué el POST sigue en 201 si OpenAI falla?
+
+El enunciado pide modo degradado, no “el ticket espera al LLM”. Un 502 dejaría al colaborador sin solicitud. Se crea igual, con `Sin clasificar` / `Media` y `origen_clasificacion=degradado`.
+
+**Cómo lo digo:** *El 401 o el 429 son de OpenAI. El 201 es de la mesa. Si mezclo esos códigos, el Authorize de Swagger parece roto cuando lo que falló fue la cuota.*
+
+Evidencia: `test_post_201_si_el_llm_responde_500`. En vivo: quite `IA_API_KEY`, reinicie, mismo POST.
+
+### ¿Por qué no un regex de “vacaciones” / “urgente”?
+
+Se evaluó **después** de ver el LLM. El camino principal ya etiqueta Vacaciones/Crítica. Un texto ambiguo (calendario + módulo) el propio modelo deja en `Sin clasificar` con `origen=proveedor`: no es un fallo, es abstención. El regex copiaría el catálogo de la limpieza, acertaría el caso feliz y mentiría en otros. El degradado sin regex dice la verdad: *no clasificamos, el ticket existe*.
+
+### ¿Qué context engineering se aplicó?
+
+El prompt no se limita a pedir “clasifique”. Deriva el catálogo desde la misma
+fuente de la limpieza e incorpora la sección 3 de `POL-TIC-05`: Crítica para
+servicio esencial o sede, Alta para proceso completo o más de diez usuarios,
+Media para un usuario con alternativa y Baja sin afectación operativa. No eleva
+solo por la palabra “urgente”, exige abstención y contiene tres ejemplos: caída
+general, solicitud planificada e intento de inyección. Asunto y descripción
+viajan como JSON separado y se declaran datos no confiables; una orden escrita
+dentro del ticket no puede reemplazar las reglas del sistema.
+
+Se descartó forzar `response_format` porque el adaptador acepta OpenAI y
+proveedores compatibles que pueden no soportarlo. La salida sigue cerrada por
+parseo JSON y validación de catálogo. Las pruebas fijan prompt, contexto,
+payload, respuestas malformadas e instrucciones adversarias.
+
+### ¿Por qué timeout 8 s y un reintento?
+
+El mock mide 2,5 s de latencia → 5 s. Un chat puede tardar más en el primer
+token; 8 s no confunde “lento” con “caído”. Un reintento cubre timeout,
+conexión, 408, 425, 429 y 5xx transitorios. Un 401, JSON inválido o etiqueta
+fuera de catálogo degrada en el primer intento: repetir la misma entrada no
+corrige credenciales ni formato. Alternativa descartada: reintentos
+indiscriminados, infinitos o con espera larga.
+
+### ¿401, 429 y degradado son lo mismo?
+
+No.
+
+| Qué ves | Quién falló |
+|---|---|
+| POST `/solicitudes` **401** | Bearer de la **mesa** (`API_TOKEN` / Authorize) |
+| Terminal `http_401` y POST **201** degradado | Clave de **OpenAI** inválida |
+| Terminal `http_429` y POST **201** degradado | Cuota o tope de gasto de OpenAI (Billing y Limits; el Playground no usa tu `sk-proj`) |
+| `origen=proveedor` | El LLM contestó y la etiqueta está en el catálogo |
+
+`GET /health` → `clasificador: proveedor` solo dice que había URL y clave **al arrancar**, no que haya saldo.
+
+---
+
+## Corrección del legado (etapa 2)
+
+El original permanece en `materiales/legacy/legacy_module.py`. Se copió a
+`src/legacy/` para aplicar tres cambios puntuales y dejar el paquete recibido
+como evidencia. Las tres regresiones fallaron antes y pasan después:
+`python -m pytest tests/legacy/ -q`.
+
+### S1 — ¿Qué tickets perdía el informe?
+
+Los creados exactamente el primer y el último día. El contrato decía que los
+extremos eran inclusivos, pero el código usaba `>` y `<`.
+
+**Cómo lo digo:** *La documentación y el código se contradecían. No cambié el
+contrato: cambié dos comparadores y fijé ambos límites con una prueba.*
+
+La alternativa de usar un rango semiabierto
+`inicio <= fecha < primer_dia_siguiente` es válida para fechas y horas, pero
+cambiaría el significado del parámetro `fin` de esta función.
+
+### S2 — ¿Por qué se inflaba el segundo resumen?
+
+Python evalúa `{}` una sola vez al definir la función. Todas las llamadas sin
+acumulador reutilizaban el mismo diccionario.
+
+**Cómo lo digo:** *No era un error de suma; era estado escondido entre
+llamadas. `None` crea una cesta nueva, pero mantuve el acumulador explícito
+para no romper compatibilidad.*
+
+### S3 — ¿Por qué `estado.lower()` no era suficiente?
+
+Normalizar mayúsculas solo encontraría más tickets cuyo estado **actual** es
+Reabierto. El indicador pregunta cuántos se reabrieron alguna vez: un ticket
+puede estar Cerrado hoy y conservar `reaperturas=2`.
+
+**Cómo lo digo:** *El estado es la foto de hoy; reaperturas es el hecho
+histórico. Cuento tickets con contador positivo, no sumo eventos.*
+
+Un contador vacío o corrupto no se transforma en `1`: confirma
+desconocimiento, no cero reaperturas. Inventarlo contaminaría indicadores
+posteriores.
+
+---
+
+## Configuración, logs y secretos (etapa 2)
+
+### ¿Por qué la variable del sistema gana sobre `.env`?
+
+`.env` es comodidad local. GitHub Actions, Docker o el servidor inyectan la
+configuración en el proceso y deben poder reemplazarla sin modificar archivos.
+Una variable vieja de PowerShell se elimina; no se invierte la precedencia de
+producción para ocultarla.
+
+**Cómo lo digo:** *El código es el mismo en todos los entornos. Solo cambia la
+configuración externa: proceso primero, archivo local después y valores seguros
+al final.*
+
+### ¿Por qué `pydantic-settings` y no varios `os.environ.get()`?
+
+Centraliza el contrato y valida tipos. Un `IA_TIMEOUT=cinco`, un puerto 70000
+o un nivel `VERBOSE` fallan al cargar con un mensaje identificable, en vez de
+romper una petición más tarde. `SecretStr` además oculta tokens en `repr`.
+
+### ¿Qué significa “log estructurado”?
+
+Cada línea es un objeto JSON con nombres estables: `event`, `request_id`,
+`method`, `path`, `status_code` y `duration_ms`. No es un `print` decorado:
+una plataforma puede filtrar todos los 500 o seguir una petición por su id.
+
+**Cómo lo digo:** *Un texto libre se lee; un JSON también se consulta. El
+`X-Request-ID` de la respuesta es el mismo que acompaña la petición y los
+intentos de IA.*
+
+### ¿Por qué stdout y no un archivo `.log`?
+
+Contenedores y plataformas recogen stdout, gestionan rotación y centralizan
+eventos. Escribir archivos dentro de la aplicación exige permisos, rotación y
+limpieza, y cada réplica tendría una copia distinta.
+
+### ¿Qué no se registra?
+
+No se serializan `Authorization`, `API_TOKEN`, `IA_API_KEY`, `MOCK_TOKEN`,
+prompt, respuesta del proveedor, asunto, descripción ni solicitante. Para
+diagnosticar IA basta `timeout`, `conexion`, `http_401` o `http_429`.
+
+Evidencia:
+
+```powershell
+python -m pytest tests/configuracion/ tests/observabilidad/ -q
+git check-ignore .env
+git ls-files .env
+```
+
+El primer comando de Git debe mostrar `.env`; el segundo no debe mostrar nada.
+
+El escaneo busca formatos conocidos de OpenAI, GitHub, AWS y llaves privadas;
+también ejecuta `git ls-files --error-unmatch .env` para fijar que el archivo
+local no quede rastreado. Excluye `materiales/`: el paquete original trae un
+patrón tipo `sk-proj-…` dentro de
+`materiales/revision/pr_para_revision.diff` como parte del PR defectuoso que
+se revisará al final. No es una clave copiada desde `.env`, no se utiliza y el
+material original no se modifica.
+
+---
+
+## Documentación técnica y funcional (etapa 2)
+
+### ¿Por qué no basta Swagger?
+
+Swagger permite ejecutar el contrato y muestra restricciones, pero no explica
+por qué un listado vacío es 200, qué implica el almacenamiento en memoria ni
+qué problema resuelve para la mesa. `docs/api_contrato.md` completa las
+decisiones técnicas y `docs/api_funcional.md` habla al negocio.
+
+**Cómo lo digo:** *OpenAPI dice cómo integrarse; el documento funcional dice
+para qué vale. Si mezclo ambos, el desarrollador no encuentra códigos y el
+negocio recibe detalles de cabeceras que no necesita.*
+
+### ¿Por qué no guardaste `openapi.json` en el repositorio?
+
+Sería una segunda copia del contrato y podría quedar vieja. FastAPI lo genera
+desde modelos y rutas; `test_contrato_openapi.py` fija rutas, Bearer, esquemas,
+códigos 200/201/401/409/422/500/503 y `X-Request-ID`.
+
+### ¿Por qué el POST documenta 201 y 200?
+
+`201` crea un recurso. `200` devuelve el recurso ya existente cuando se repite
+la misma `Idempotency-Key` con el mismo cuerpo. Documentar solo 201 ocultaría
+un camino normal del cliente; documentar solo 200 ocultaría la creación.
+
+### ¿Por qué no hay `/v1`?
+
+La API ya se había probado sin prefijo y cambiarla rompería consumidores por
+una necesidad que el ejercicio todavía no tiene. La versión `0.2.0` queda en
+OpenAPI. Una ruptura futura deberá introducir una ruta versionada, no cambiar
+silenciosamente este contrato.
+
+### ¿Qué admite honestamente la documentación funcional?
+
+La API registra, clasifica, consulta y lista. Todavía no persiste al reiniciar,
+no cambia estados, no asigna agentes y usa un Bearer compartido. Es una
+demostración integrable, no un producto listo para producción.
+
+---
+
+## Pantalla Angular opcional (etapa 2)
+
+### ¿Por qué el token no está en `environment.ts`?
+
+Angular se ejecuta en el navegador: todo valor compilado puede inspeccionarse.
+`environment.ts`, un `config.json` o una cabecera escrita en el proxy no
+convierten una clave en secreto.
+
+**Cómo lo digo:** *No prometo secreto donde técnicamente no puede existir. En
+la demo el usuario introduce API_TOKEN, queda solo en memoria y producción
+debe usar identidad corporativa con tokens personales y cortos.*
+
+### ¿Cómo se evita enviarlo a un tercero?
+
+El interceptor solo añade `Authorization` cuando la URL comienza por `/api/`.
+Una petición absoluta a otro dominio no recibe la cabecera. Hay prueba para
+ambos caminos.
+
+### ¿Dónde se guarda?
+
+No se usa `localStorage`, `sessionStorage`, cookie, URL ni archivo. El campo es
+de tipo `password`, se vacía al cargar el valor y el servicio lo elimina al
+recargar, destruir el componente, pulsar “Eliminar token” o recibir 401.
+
+“Mostrar” solo cambia temporalmente el tipo del campo mientras el usuario
+revisa lo que escribió; el valor guardado nunca se vuelve a renderizar. El
+indicador no confunde “token presente” con “autenticado”: pasa a verde solo
+después de que `GET /solicitudes` responde 200. Al guardar también ejecuta la
+primera consulta para evitar una segunda acción ambigua.
+
+El formulario previene explícitamente el submit nativo y el campo carece de
+`name`: aunque una defensa se quite por error, el navegador no debe construir
+`?api-token=...`. `test_impide_que_el_formulario_serialice_el_token_en_la_url`
+fija esa regresión.
+
+### ¿Qué bordes muestra la pantalla?
+
+Carga, lista vacía (200), token rechazado (401), API sin configurar (503),
+desconexión y error inesperado. Cuando la API entrega `X-Request-ID`, se
+muestra como referencia para buscar el evento en logs.
+
+### ¿Por qué no muestra descripción ni solicitante?
+
+La bandeja solo necesita identificar y priorizar. Omitir esos campos reduce
+la exposición de información personal; el contrato TypeScript los conserva
+porque la API los devuelve, pero la tabla no los renderiza.
+
+### ¿Qué se descartó?
+
+Crear solicitudes, editar estado, login simulado, dashboard y paginación
+completa. El punto opcional pide consumir el listado con filtros; ampliar el
+alcance escondería la integración y sus decisiones de seguridad.

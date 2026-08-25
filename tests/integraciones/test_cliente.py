@@ -158,7 +158,7 @@ def test_422_del_proveedor():
 
 
 def test_desde_entorno_sin_token(monkeypatch):
-    monkeypatch.delenv("MOCK_TOKEN", raising=False)
+    monkeypatch.setenv("MOCK_TOKEN", "")
     with pytest.raises(ErrorAutorizacion, match="MOCK_TOKEN"):
         ClienteMock.desde_entorno()
 

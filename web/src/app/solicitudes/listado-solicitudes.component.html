@@ -1,0 +1,181 @@
+<main class="pagina">
+  <header class="encabezado">
+    <div>
+      <p class="sobrelinea">LA FORTUNA · Operación interna</p>
+      <h1>Mesa de Ayuda Inteligente</h1>
+      <p>Consulta solicitudes recientes y filtra la bandeja de atención.</p>
+    </div>
+    <span class="entorno">Demo local</span>
+  </header>
+
+  <section class="panel seguridad" aria-labelledby="titulo-token">
+    <div>
+      <h2 id="titulo-token">Acceso temporal</h2>
+      <p>
+        El token permanece únicamente en memoria. No se guarda en archivos,
+        almacenamiento web ni URL y desaparece al recargar o cerrar.
+      </p>
+    </div>
+
+    @if (!tokenConfigurado()) {
+      <form class="token-form" (submit)="guardarToken($event)" novalidate>
+        <label for="api-token">API_TOKEN local</label>
+        <div class="fila-token">
+          <input
+            id="api-token"
+            [type]="mostrarToken() ? 'text' : 'password'"
+            autocomplete="off"
+            spellcheck="false"
+            [formControl]="tokenControl"
+            aria-describedby="ayuda-token"
+          />
+          <button
+            type="button"
+            class="secundario mostrar-token"
+            (click)="alternarVisibilidadToken()"
+            [attr.aria-pressed]="mostrarToken()"
+          >
+            {{ mostrarToken() ? 'Ocultar' : 'Mostrar' }}
+          </button>
+          <button type="submit" class="primario" [disabled]="cargando()">
+            Validar y consultar
+          </button>
+        </div>
+        <small id="ayuda-token">No utilice una clave de OpenAI en este campo.</small>
+      </form>
+    } @else {
+      <div class="token-activo">
+        <span aria-label="Token cargado">● Token presente en memoria</span>
+        <button type="button" class="secundario" (click)="quitarToken()">
+          Eliminar token
+        </button>
+      </div>
+    }
+
+    <div
+      class="estado-auth"
+      [class.autenticado]="estadoAutenticacion() === 'autenticado'"
+      [class.rechazado]="estadoAutenticacion() === 'rechazado' || estadoAutenticacion() === 'error'"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="punto" aria-hidden="true"></span>
+      {{ textoAutenticacion() }}
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="titulo-filtros">
+    <div class="titulo-panel">
+      <div>
+        <h2 id="titulo-filtros">Filtros</h2>
+        <p>Las coincidencias son exactas y sensibles a mayúsculas.</p>
+      </div>
+    </div>
+
+    <form class="filtros" [formGroup]="filtros" (ngSubmit)="consultar()">
+      <label>
+        Área
+        <input type="text" formControlName="area" placeholder="Aplicaciones" />
+      </label>
+
+      <label>
+        Estado
+        <select formControlName="estado">
+          <option value="">Todos</option>
+          <option value="Abierto">Abierto</option>
+        </select>
+      </label>
+
+      <label>
+        Prioridad
+        <select formControlName="prioridad">
+          <option value="">Todas</option>
+          <option value="Crítica">Crítica</option>
+          <option value="Alta">Alta</option>
+          <option value="Media">Media</option>
+          <option value="Baja">Baja</option>
+        </select>
+      </label>
+
+      <label>
+        Límite
+        <input type="number" min="1" max="200" formControlName="limite" />
+      </label>
+
+      <div class="acciones">
+        <button type="submit" class="primario" [disabled]="cargando()">
+          {{ cargando() ? 'Consultando…' : 'Consultar' }}
+        </button>
+        <button type="button" class="secundario" (click)="limpiarFiltros()">
+          Limpiar
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel resultados" aria-labelledby="titulo-resultados" [attr.aria-busy]="cargando()">
+    <div class="titulo-panel">
+      <div>
+        <h2 id="titulo-resultados">Solicitudes</h2>
+        <p>{{ solicitudes().length }} resultado(s)</p>
+      </div>
+      @if (requestId()) {
+        <small class="referencia">Referencia: {{ requestId() }}</small>
+      }
+    </div>
+
+    @if (mensajeError()) {
+      <div class="mensaje error" role="alert">{{ mensajeError() }}</div>
+    }
+
+    @if (cargando()) {
+      <div class="mensaje" role="status">Consultando la API…</div>
+    } @else if (!consultado()) {
+      <div class="mensaje">Configure el token y ejecute la primera consulta.</div>
+    } @else if (solicitudes().length === 0 && !mensajeError()) {
+      <div class="mensaje" role="status">
+        No hay solicitudes que coincidan con los filtros.
+      </div>
+    } @else if (solicitudes().length > 0) {
+      <div class="tabla-contenedor">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Asunto</th>
+              <th>Área</th>
+              <th>Estado</th>
+              <th>Categoría</th>
+              <th>Prioridad</th>
+              <th>Origen</th>
+              <th>Creada</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (solicitud of solicitudes(); track solicitud.id) {
+              <tr>
+                <td><code>{{ solicitud.id }}</code></td>
+                <td>{{ solicitud.asunto }}</td>
+                <td>{{ solicitud.area }}</td>
+                <td><span class="etiqueta">{{ solicitud.estado }}</span></td>
+                <td>{{ solicitud.categoria }}</td>
+                <td>
+                  <span class="etiqueta prioridad">{{ solicitud.prioridad }}</span>
+                </td>
+                <td>
+                  <span
+                    class="etiqueta"
+                    [class.degradado]="solicitud.origen_clasificacion === 'degradado'"
+                  >
+                    {{ solicitud.origen_clasificacion }}
+                  </span>
+                </td>
+                <td>{{ solicitud.fecha_creacion | date: 'medium' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</main>
