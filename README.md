@@ -17,7 +17,7 @@ README raíz, como pide el enunciado; las etapas 2 a 5 no abren otro.
 3. [Etapa 0](#etapa-0--contextualización) - Contextualizacion.
 4. [Etapa 1](#etapa-1--fundamentos) — CSV, mock, SQL y pruebas.
 5. [Etapa 2](#etapa-2--autonomía-e-integración) — API, IA, legado, config, Angular.
-6. [Etapa 3](#etapa-3--complejidad-y-calidad) — RAG hecho; CI y seguridad avanzada pendientes.
+6. [Etapa 3](#etapa-3--complejidad-y-calidad) — RAG, abstención, CI, seguridad, métricas y artefacto cerrados.
 7. [Etapa 4](#etapa-4--arquitectura-y-orquestación) — base documentada; implementación pendiente.
 8. [Etapa 5](#etapa-5--estrategia-y-evaluación) — base documentada; implementación pendiente.
 9. [Mapa del código](#mapa-del-código)
@@ -635,8 +635,10 @@ instala `requirements-dev.txt`, Ruff (errores críticos) y pytest. El
 después de calidad, sin introducir código inválido.
 
 Evidencia: `docs/evidencia_ci.md`. Local equivalente:
-**Ruff OK; 196 passed, 3 xfailed**. Las URLs remotas se agregan tras el primer
-push.
+**Ruff OK; 196 passed, 3 xfailed**. Remotas:
+[verde](https://github.com/JDaniloN/mesa-ayuda-inteligente/actions/runs/32885632111)
+y
+[roja](https://github.com/JDaniloN/mesa-ayuda-inteligente/actions/runs/32885796312).
 
 **Fallos anticipados.** Suite roja por embeddings fake; Ruff estricto que
 bloquearía el repo por estilo; dependencias sin pin; evidencia remota inventada.
@@ -697,8 +699,9 @@ porque cubre prompts, commits y seguridad en una sola página accionable.
 
 Los ítems de complejidad y calidad de esta entrega cumplen el criterio 4 en
 diseño: fallos anticipados, alternativas justificadas y riesgos residuales
-declarados. Queda pendiente a mano la declaración de uso de IA y, tras el
-push, pegar las dos URLs remotas de CI en `docs/evidencia_ci.md`.
+declarados. Las URLs remotas de CI ya están en `docs/evidencia_ci.md`. Queda
+pendiente a mano completar las celdas vacías de `docs/declaracion_uso_ia.md`
+(etapas 1–3) y, si el alcance sigue, la etapa 4.
 
 ---
 
@@ -1000,7 +1003,7 @@ tests/               mismo mapa que src/; evaluacion/ en la etapa 5
 sql/                 consultas de la etapa 1 y runner
 docs/                declaración de IA, contrato, funcional, causas del legado
 docs/adr/            tres ADR (etapa 4, pendiente)
-ci/                  pipeline (etapa 3, pendiente)
+ci/                  pipeline (etapa 3; workflow en `.github/workflows/ci.yml`)
 web/                 listado Angular con filtros (etapa 2, opcional)
 notebooks/           línea base clásica (etapa 5, pendiente)
 materiales/          paquete original; no modificar mock ni PDF

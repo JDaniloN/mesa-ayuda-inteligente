@@ -38,8 +38,16 @@ pruebas. En GitHub Actions:
 2. Desmarcar `demostrar_fallo` para la ejecución verde.
 3. Marcarlo para la ejecución roja.
 
-Las URLs de ambas ejecuciones se agregan a esta evidencia después del primer
-push; no se presentan ejecuciones locales como si fueran ejecuciones remotas.
+## Ejecuciones remotas
+
+- Exitosa (CI #4, `demostrar_fallo` desmarcado):
+  https://github.com/JDaniloN/mesa-ayuda-inteligente/actions/runs/32885632111
+- Fallida controlada (CI #5, `demostrar_fallo` marcado):
+  https://github.com/JDaniloN/mesa-ayuda-inteligente/actions/runs/32885796312
+
+Ambas se dispararon con `workflow_dispatch` sobre `main` (`835fa75`). La verde
+terminó en Success; la roja en Failure por el paso deliberado de evidencia,
+no por un test productivo roto.
 
 ## Por qué este diseño
 
