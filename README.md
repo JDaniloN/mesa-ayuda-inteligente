@@ -4,10 +4,11 @@ Prueba técnica de nivelación — Familia de cargos IA · LA FORTUNA S.A.
 
 **Nivel objetivo:** Ingeniero IA Middle II.
 
-Este README es la guía de evaluación y el guion del recorrido. Recorre las
-etapas en orden: qué se implementó, cómo probarlo, qué debe aparecer y qué
-sigue pendiente. Un solo README raíz, como pide el enunciado; las etapas 2 a 5
-no abren otro.
+Este README es la guía de evaluación y el recorrido reproducible de la
+implementación. Recorre las etapas en orden: qué se implementó, cómo
+probarlo, qué debe aparecer y qué sigue pendiente. Quien siga Preparación y
+cada etapa debe obtener los mismos resultados documentados aquí. Un solo
+README raíz, como pide el enunciado; las etapas 2 a 5 no abren otro.
 
 Nota: 
 Para Desarrollar e implementar la solucion a cada una de las etapas utilice los modelos de grok 4.5 y chatgpt 5.6 sol ambos en su version high para obtener los mejores resultados posibles, poniendo como objetivo lograr el criterio 4 en cada una de los items que comprendia cada etapa y asi poder culminar de forma eficiente el proyecto dentro de los 3 dias.
@@ -17,15 +18,14 @@ Para Desarrollar e implementar la solucion a cada una de las etapas utilice los 
 ## Cómo leer este repositorio
 
 1. [Estado](#estado) — hasta dónde llegó la entrega.
-2. [Guion del video](#guion-del-video-5-minutos) — checklist de grabación (demo real).
-3. [Preparación](#preparación-una-sola-vez) — entorno, `.env` y mock.
-4. [Etapa 0](#etapa-0--contextualización) — contextualización.
-5. [Etapa 1](#etapa-1--fundamentos) — CSV, mock, SQL y pruebas.
-6. [Etapa 2](#etapa-2--autonomía-e-integración) — API, IA, legado, config, Angular.
-7. [Etapa 3](#etapa-3--complejidad-y-calidad) — RAG, abstención, CI, seguridad, métricas y artefacto.
-8. [Etapa 4](#etapa-4--arquitectura-y-orquestación) — arquitectura y ADR hechos; demo/webhook pendientes.
-9. [Etapa 5](#etapa-5--estrategia-y-evaluación) — plan fase 1; entregables finales pendientes.
-10. [Mapa del código](#mapa-del-código)
+2. [Preparación](#preparación-una-sola-vez) — entorno, `.env` y mock.
+3. [Etapa 0](#etapa-0--contextualización) — contextualización.
+4. [Etapa 1](#etapa-1--fundamentos) — CSV, mock, SQL y pruebas.
+5. [Etapa 2](#etapa-2--autonomía-e-integración) — API, IA, legado, config, Angular.
+6. [Etapa 3](#etapa-3--complejidad-y-calidad) — RAG, abstención, CI, seguridad, métricas y artefacto.
+7. [Etapa 4](#etapa-4--arquitectura-y-orquestación) — arquitectura y ADR hechos; demo/webhook pendientes.
+8. [Etapa 5](#etapa-5--estrategia-y-evaluación) — plan fase 1; entregables finales pendientes.
+9. [Mapa del código](#mapa-del-código)
 
 `materiales/` es el paquete original. No se modifica.
 
@@ -69,112 +69,6 @@ nuevos de esas etapas.
 
 ---
 
-## Guion del video (5 minutos)
-
-Este bloque es el recorrido de grabación. Solo muestra lo **implementado**
-(etapas 0–3) y, al final, el **diseño** de la etapa 4. No invente demo de
-orquestación/webhook ni entregables de la etapa 5: el README ya los marca
-pendientes.
-
-### Antes de pulsar grabar
-
-```
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements-dev.txt
-python -m src.rag
-python -m src.api
-```
-
-En otra terminal (solo si muestra el mock de la etapa 1):
-
-```
-cd materiales/servicio_mock
-uvicorn app:app --port 8080
-```
-
-Comprobar:
-
-| Chequeo | Esperado |
-|---|---|
-| http://127.0.0.1:8000/docs | Swagger de la API propia |
-| Authorize | Bearer = `API_TOKEN` de `.env` (no la clave OpenAI) |
-| `GET /health` | `estado: operativo` y `clasificador: proveedor` (con `IA_API_KEY`) |
-| Índice RAG | Ya corrido `python -m src.rag` (si no, `/politicas/consultar` → 503) |
-
-### Minuto a minuto (seguir en orden)
-
-| Min | Qué decir / mostrar | Dónde | Resultado que debe verse |
-|---|---|---|---|
-| 0:00 | Qué es el repo, nivel Middle II, **hasta etapa 3 hecha**; etapa 4 en diseño; etapa 5 en plan | Este README → [Estado](#estado) | Tabla de estado sin contradicciones |
-| 0:30 | Alta de solicitud con IA | Swagger `POST /solicitudes` + cuerpo del [ítem API](#api-propia) | **201**, `SOL-…`, categoría/prioridad, `origen_clasificacion` |
-| 1:00 | Idempotencia | Mismo POST + misma cabecera `Idempotency-Key` (en Swagger: Parameters) | **200**, mismo id, sin segunda llamada “visible” |
-| 1:20 | RAG de dos hechos (hero) | `POST /politicas/consultar` con la pregunta de **cierre y reapertura** abajo | Texto con **2 días hábiles** (cierre) y **5 días hábiles** (reabrir); citas `POL-TIC-05` §7 y §6.1 |
-| 2:10 | Abstención sin inventar | Misma ruta, pregunta Japón | Mensaje fijo + `citas: []` |
-| 2:40 | Calidad local | Terminal: `ruff check --select E9,F63,F7,F82 src tests` y `python -m pytest -q` | Ruff OK; **199 passed** |
-| 3:10 | CI verde/rojo | `docs/evidencia_ci.md` + links de Actions | Diseño del pipeline; camino rojo con `demostrar_fallo` |
-| 3:40 | Seguridad + métricas | Abrir `docs/informe_seguridad_ia.md`; Swagger `GET /metricas/resumen` | Cuatro hallazgos corregidos; agregados sin prompts |
-| 4:10 | Etapa 4 (solo diseño) | `docs/arquitectura.md` + un ADR | Flujos etiquetados Implementado vs Diseño; **sin** correr `src/orquestacion` (solo stub) |
-| 4:40 | Cierre honesto | Residuales | Umbral RAG sin gold set; demo/webhook etapa 4 y entregables etapa 5 **pendientes**; video + PC-GTH-68 al cerrar entrega |
-
-### Cuerpos listos para pegar en Swagger
-
-`POST /solicitudes` (Authorize previo):
-
-```json
-{
-  "asunto": "No puedo ingresar al correo corporativo",
-  "descripcion": "El acceso falla desde esta mañana.",
-  "area": "Aplicaciones",
-  "solicitante": "persona@lafortuna.com.co",
-  "canal": "api"
-}
-```
-
-`POST /politicas/consultar` — hero (cierre + reapertura):
-
-```json
-{
-  "pregunta": "Tras solucionarse un incidente en la mesa de ayuda, ¿cuánto tiempo tiene el sistema para cerrarlo automáticamente si el usuario no responde, y cuánto tiempo tiene el usuario para reabrirlo si la falla vuelve a presentarse?",
-  "limite": 4
-}
-```
-
-`POST /politicas/consultar` — abstención:
-
-```json
-{
-  "pregunta": "¿Cuál es la capital de Japón?",
-  "limite": 4
-}
-```
-
-Mensaje fijo de abstención (debe coincidir carácter a carácter):
-
-```
-No encontré información suficiente en las políticas proporcionadas para responder la pregunta.
-```
-
-Opcional si sobra tiempo: pregunta de **problema vs crítico** (citas §6.3 y §5.1):
-
-```json
-{
-  "pregunta": "Si un ticket se reabre tres veces, ¿en qué se convierte y qué ocurre si un incidente es clasificado como crítico?",
-  "limite": 4
-}
-```
-
-### Qué no grabar como “ya hecho”
-
-- `python -m src.orquestacion` / `tests/orquestacion/` — pendientes (paquete vacío).
-- Webhook `/webhook/mensajeria` con backoff — pendiente etapa 4.
-- `docs/decision_ia_vs_automatizacion.md`, gold ≥50, suite `tests/evaluacion/`, notebook ML — pendientes etapa 5.
-- Angular (`http://localhost:4200`) — opcional; no bloquea el guion.
-
-El detalle de cada comando está en las secciones de etapa más abajo; este
-guion solo fija el orden y el resultado esperado en cámara.
-
----
-
 ## Preparación (una sola vez)
 
 Python 3. Entorno virtual y variables en `.env` (no se pegan secretos en la
@@ -189,7 +83,7 @@ Copy-Item .env.example .env
 ```
 
 `requirements-dev.txt` incluye `requirements.txt` más Ruff (necesario para el
-paso de calidad del video y del CI).
+paso de calidad local y del CI).
 Editar `.env`:
 
 | Variable | Para qué | Dónde se usa |
@@ -722,8 +616,7 @@ python -m pytest tests/rag/ tests/api/test_politicas.py tests/api/test_contrato_
 ```
 
 En Swagger (`http://127.0.0.1:8000/docs`), `POST /politicas/consultar` con
-Bearer. Usar los cuerpos del [guion del video](#guion-del-video-5-minutos).
-Ejemplos mínimos:
+Bearer. Ejemplos mínimos:
 
 ```json
 {
@@ -1154,10 +1047,10 @@ límites de fecha, N+1, mezcla de responsabilidades) y tres reglas de equipo
 que se puedan aplicar en el siguiente PR.
 
 **Qué quedó pendiente.** La revisión escrita y el estándar. El video de
-recorrido (máximo 5 min) sigue el [guion del video](#guion-del-video-5-minutos):
-qué se construyó, hasta qué etapa, dos decisiones (p. ej. degradado sin tumbar
-el alta; abstenerse sin inventar) y qué se haría distinto. Se graba al cerrar
-la entrega.
+recorrido (máximo 5 min), al cerrar la entrega, sigue este README en orden
+(Estado → Preparación → etapas 0–3 implementadas; etapa 4 solo diseño; etapa
+5 solo plan): qué se construyó, cómo reproducirlo, qué resultados aparecen y
+qué quedó pendiente. No hay guion aparte.
 
 ### Cierre de la etapa 5
 
