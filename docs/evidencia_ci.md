@@ -16,9 +16,11 @@ All checks passed!
 Exit code: 0
 ```
 
-Los tres `xfail` están documentados: el embedding léxico falso no reproduce
-tres rankings ya validados manualmente con el índice real. No llaman a OpenAI
-en CI y no ocultan una excepción de producción.
+Los tres `xfail` están en `tests/rag/test_consultas_compuestas.py`. Con
+`EmbeddingsFalsos` siguen fallando (XFAIL, no XPASS). El contraste con el
+índice real y los asserts exactos está en `docs/evidencia_xfail_rag.md`: solo
+*problema vs crítico* pasa hoy con OpenAI; cierre/reapertura aún no ancla
+§6.1. No llaman a OpenAI en CI y no ocultan una excepción de producción.
 
 ## Camino fallido controlado
 
@@ -53,7 +55,7 @@ no por un test productivo roto.
 
 - Ruff solo con `E9,F63,F7,F82`: evita fallar el pipeline por estilo heredado.
 - Un runner Ubuntu: Chroma y pdfplumber son más estables ahí que en matrix.
-- Tres `xfail` documentados: el doble léxico no es el índice real ya validado.
+- Tres `xfail` documentados: ver `docs/evidencia_xfail_rag.md` (fake vs real).
 - Camino rojo con `demostrar_fallo`: no se rompe un test productivo para la
   evidencia.
 

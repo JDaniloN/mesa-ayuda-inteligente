@@ -4,9 +4,10 @@ Prueba técnica de nivelación — Familia de cargos IA · LA FORTUNA S.A.
 
 **Nivel objetivo:** Ingeniero IA Middle II.
 
-Este README es la guía de evaluación. Recorre las etapas en orden: qué se
-implementó, cómo probarlo, qué debe aparecer y qué sigue pendiente. Un solo
-README raíz, como pide el enunciado; las etapas 2 a 5 no abren otro.
+Este README es la guía de evaluación y el guion del recorrido. Recorre las
+etapas en orden: qué se implementó, cómo probarlo, qué debe aparecer y qué
+sigue pendiente. Un solo README raíz, como pide el enunciado; las etapas 2 a 5
+no abren otro.
 
 ---
 
@@ -14,36 +15,53 @@ README raíz, como pide el enunciado; las etapas 2 a 5 no abren otro.
 
 1. [Estado](#estado) — hasta dónde llegó la entrega.
 2. [Preparación](#preparación-una-sola-vez) — entorno, `.env` y mock.
-3. [Etapa 0](#etapa-0--contextualización) - Contextualizacion.
+3. [Etapa 0](#etapa-0--contextualización) — contextualización.
 4. [Etapa 1](#etapa-1--fundamentos) — CSV, mock, SQL y pruebas.
 5. [Etapa 2](#etapa-2--autonomía-e-integración) — API, IA, legado, config, Angular.
-6. [Etapa 3](#etapa-3--complejidad-y-calidad) — RAG, abstención, CI, seguridad, métricas y artefacto cerrados.
-7. [Etapa 4](#etapa-4--arquitectura-y-orquestación) — base documentada; implementación pendiente.
-8. [Etapa 5](#etapa-5--estrategia-y-evaluación) — plan fase 1 listo para revisión; implementación pendiente.
+6. [Etapa 3](#etapa-3--complejidad-y-calidad) — RAG, abstención, CI, seguridad, métricas y artefacto.
+7. [Etapa 4](#etapa-4--arquitectura-y-orquestación) — arquitectura y ADR hechos; demo/webhook pendientes.
+8. [Etapa 5](#etapa-5--estrategia-y-evaluación) — plan fase 1; entregables finales pendientes.
 9. [Mapa del código](#mapa-del-código)
 
 `materiales/` es el paquete original. No se modifica.
 
-Documentos de entrega en `docs/`: `declaracion_uso_ia.md`, `api_contrato.md`,
-`api_funcional.md`, `legacy_causas.md`. Las etapas 4 y 5 dejarán además
-arquitectura, ADR, decisión, métricas, revisión del PR y estándar de
-ingeniería; las rutas están en cada ítem.
+Documentos de entrega en `docs/`:
+
+| Documento | Etapa |
+|---|---|
+| `declaracion_uso_ia.md` | Todas (obligatoria) |
+| `api_contrato.md`, `api_funcional.md` | 2 |
+| `legacy_causas.md` | 2 |
+| `evidencia_ci.md`, `evidencia_xfail_rag.md`, `informe_seguridad_ia.md`, `estandar_revision_codigo_ia.md` | 3 |
+| `arquitectura.md`, `adr/001…003` | 4 (diseño cerrado) |
+| `etapa4_fase1_plan.md` | 4 (plan previo; no sustituye los ADR) |
+| `etapa5_fase1_plan.md` | 5 (plan; no sustituye decisión, métricas ni revisión del PR) |
+
+Las rutas de los entregables finales de las etapas 4 y 5 están en cada ítem.
 
 ---
 
 ## Estado
 
+**Hasta dónde llegó esta entrega:** etapas **0 a 3 implementadas y documentadas**.
+De la etapa **4** están cerrados el documento de arquitectura y los tres ADR;
+siguen pendientes la demo de orquestación, el cliente webhook y el corte de
+presupuesto en código. La etapa **5** tiene plan de fase 1; sin entregables
+finales.
+
 | Estado | Etapa | Alcance |
 |---|---|---|
-| Hecha | 0. Contextualización | Enunciado, materiales y alcance Middle II |
+| Hecha | 0. Contextualización | Enunciado, materiales y nivel objetivo Middle II |
 | Implementación hecha | 1. Fundamentos | Limpieza del CSV, cliente del mock y tres consultas SQL |
 | Implementación hecha | 2. Autonomía e integración | API, clasificador IA, legado, configuración, docs y Angular |
-| En curso | 3. Complejidad y calidad | RAG de políticas hecho. Faltan CI, seguridad avanzada y el resto |
-| Base en este README | 4. Arquitectura y orquestación | Diseño, tres ADR, demo mínima, webhook, datos, secretos y costo |
-| Base en este README | 5. Estrategia y evaluación | Decisión R-01…R-03, métricas previas, ML clásico, revisión del PR y video |
+| Implementación hecha | 3. Complejidad y calidad | RAG, abstención, CI (verde y rojo), seguridad, métricas y estándar |
+| Diseño parcial | 4. Arquitectura y orquestación | Arquitectura + 3 ADR hechos. Faltan demo, webhook en código y corte de presupuesto en código |
+| Plan fase 1 | 5. Estrategia y evaluación | Plan en `docs/etapa5_fase1_plan.md`. Faltan decisión, gold ≥50, suite, ML, revisión del PR y video |
 
-Antes de entregar hay que completar a mano la declaración de uso de IA de las
-etapas 1 y 2 en `docs/declaracion_uso_ia.md`. La etapa 0 ya está llena.
+**Pendiente transversal antes de entregar:** la declaración de uso de IA
+(`docs/declaracion_uso_ia.md`) ya cubre las etapas 0–5 según el trabajo
+hecho (en 4 y 5: el plan de fase 1). Revisarla si se cierran entregables
+nuevos de esas etapas.
 
 ---
 
@@ -107,13 +125,14 @@ Abrir `docs/declaracion_uso_ia.md` y revisar la tabla de la etapa 0.
 
 ### Qué resultados aparecen
 
-Cinco respuestas de la etapa 0 completas. Las tablas de las etapas 1 a 5
-siguen con el formato oficial y, salvo la 0, pendientes de llenar a mano.
+Cinco respuestas de la etapa 0 completas. Las tablas de las etapas 1–5
+también están rellenadas en `docs/declaracion_uso_ia.md` según el trabajo
+hecho (en 4 y 5: el plan de fase 1, no los entregables finales).
 
 ### Qué quedó pendiente
 
-Nada de contextualización. Las declaraciones de las etapas posteriores se
-llenan al cerrar cada una.
+Nada de contextualización. Actualizar la declaración si se cierran
+entregables nuevos de las etapas 4 o 5.
 
 ---
 
@@ -308,8 +327,10 @@ propuestos, no aplicados: `tickets(estado)`, `tickets(reaperturas)`,
 
 ### Cierre de la etapa 1
 
-**Qué quedó pendiente.** Completar a mano la declaración de uso de IA de la
-etapa 1 en `docs/declaracion_uso_ia.md`.
+**Estado:** implementación hecha (CSV, mock y SQL).
+
+**Qué quedó pendiente.** Nada de esta etapa para la declaración: la tabla
+de la etapa 1 en `docs/declaracion_uso_ia.md` está completa.
 
 ---
 
@@ -541,12 +562,18 @@ corporativo y no guarda el token entre recargas. Es una bandeja de consulta.
 
 ### Cierre de la etapa 2
 
-**Qué quedó pendiente.** Completar a mano la declaración de uso de IA de la
-etapa 2 en `docs/declaracion_uso_ia.md`.
+**Estado:** implementación hecha (API, IA, legado, config, docs y Angular
+opcional).
+
+**Qué quedó pendiente.** Nada de esta etapa para la declaración: la tabla
+de la etapa 2 en `docs/declaracion_uso_ia.md` está completa.
 
 ---
 
 ## Etapa 3 — Complejidad y calidad
+
+**Estado:** implementación hecha. Los seis ítems de abajo están cerrados;
+el residual del umbral RAG y los tres `xfail` quedan declarados al final.
 
 ### RAG de políticas internas (este ítem)
 
@@ -603,12 +630,13 @@ No encontré información suficiente en las políticas proporcionadas para respo
 y `citas: []`.
 
 **Qué quedó pendiente de este ítem.** No se sustituye Chroma, no hay reranker
-LLM y `RAG_MIN_SCORE` no está calibrado con un gold set. Tres regresiones
-(cierre/reapertura `§7`+`§6.1`, crítico `§5.1`, y el ancla de multi-query de
-cierre) son `xfail` documentados porque el embedding fake no reproduce esos
-rankings; la evaluación manual con el índice real sí los cubre. El texto plano
-de tablas de POL-TIC-05 se omite a favor de una representación clave-valor;
-no se altera `materiales/`.
+LLM y `RAG_MIN_SCORE` no está calibrado con un gold set. Tres regresiones en
+`tests/rag/test_consultas_compuestas.py` son `xfail`: con `EmbeddingsFalsos`
+siguen fallando (XFAIL, no XPASS). Con el índice real solo *problema vs
+crítico* cumple §6.3+§5.1; cierre/reapertura recupera §7 pero aún no §6.1.
+Evidencia reproducible: `docs/evidencia_xfail_rag.md`. El texto plano de
+tablas de POL-TIC-05 se omite a favor de una representación clave-valor; no
+se altera `materiales/`.
 
 ### Abstención sin evidencia
 
@@ -697,11 +725,18 @@ porque cubre prompts, commits y seguridad en una sola página accionable.
 
 ### Cierre de la etapa 3
 
-Los ítems de complejidad y calidad de esta entrega cumplen el criterio 4 en
-diseño: fallos anticipados, alternativas justificadas y riesgos residuales
-declarados. Las URLs remotas de CI ya están en `docs/evidencia_ci.md`. Queda
-pendiente a mano completar las celdas vacías de `docs/declaracion_uso_ia.md`
-(etapas 1–3) y, si el alcance sigue, la etapa 4.
+**Estado:** implementación hecha. Los seis ítems de esta etapa están
+cerrados: RAG con citas, abstención con prueba HTTP, CI con evidencia verde
+y roja (`docs/evidencia_ci.md`), informe de seguridad con correcciones
+aplicadas, métricas de latencia/tokens y estándar de revisión de código IA.
+
+Cada ítem declara fallos anticipados, alternativas descartadas y riesgos
+residuales. Residual explícito del RAG: `RAG_MIN_SCORE` es provisional (sin
+gold set) y tres rankings quedan como `xfail` (detalle en `docs/evidencia_xfail_rag.md`).
+
+**Qué quedó pendiente.** Nada de esta etapa para la declaración: la tabla
+de la etapa 3 en `docs/declaracion_uso_ia.md` está completa. La calibración
+del umbral con gold set pertenece a la etapa 5.
 
 ---
 
@@ -712,42 +747,49 @@ sobre el diseño y las decisiones**, no sobre el sistema completo. Basta una
 demostración mínima del flujo, aunque sea parcial. Si la orquestación llega a
 funcionar de punta a punta, se reconoce en escalabilidad.
 
-**Método de esta entrega.** Dos fases:
+**Estado actual.** Cerrados: `docs/arquitectura.md` y los tres ADR en
+`docs/adr/`. El plan de fase 1 permanece como traza en
+`docs/etapa4_fase1_plan.md`. **Aún no acreditan solos la etapa completa:**
+faltan demo mínima de orquestación, cliente webhook con backoff/pruebas y
+(opcional) enganche del corte por presupuesto a métricas.
 
-1. Fase 1 — plan documental: paso a paso y control de errores (criterio 4)
-   por ítem → `docs/etapa4_fase1_plan.md` (**listo para revisión**).
-2. Fase 2 — tu retroalimentación + cierre de entregables
-   (`arquitectura.md`, ADR, demo mínima acordada).
+**Método (dos fases):**
 
-Cada ítem de abajo es la base prevista. El detalle operativo está en el plan.
+1. Fase 1 — plan documental → `docs/etapa4_fase1_plan.md` (**hecho**).
+2. Fase 2 — entregables: arquitectura + ADR (**hecho**); demo, webhook y
+   costo operativo (**pendiente**).
+
+Cada ítem de abajo indica qué ya se puede abrir y qué sigue en código.
 
 ### Documento de arquitectura y tres ADR
 
-**Qué se hizo.** Pendiente. Irá en:
+**Qué se hizo.** Cerrado:
 
-| Entregable | Ruta prevista |
+| Entregable | Ruta |
 |---|---|
-| Diagrama de componentes y flujo extremo a extremo | `docs/arquitectura.md` |
-| ADR 1 — orquestador (n8n, agentes u implementación propia) | `docs/adr/001-orquestador.md` |
+| Diagrama de componentes, flujos E2E, datos, secretos y costo | `docs/arquitectura.md` |
+| ADR 1 — orquestador (código propio) | `docs/adr/001-orquestador.md` |
 | ADR 2 — integración bidireccional e idempotencia | `docs/adr/002-integracion-bidireccional.md` |
 | ADR 3 — modelo relacional e indexación vectorial | `docs/adr/003-diseno-datos.md` |
 
-Cada ADR debe dejar alternativa elegida, alternativas descartadas, motivo y
-consecuencia negativa aceptada.
+Cada ADR deja alternativa elegida, alternativas descartadas, motivo,
+consecuencia negativa aceptada y fallos anticipados. La arquitectura etiqueta
+**Implementado** vs **Diseño** para no confundir docs con código.
 
 **Cómo probarlo.** Abrir esos cuatro archivos y contrastarlos con el flujo
 declarado: clasificar → consultar políticas → redactar respuesta → escalar
-si la confianza es baja.
+si la confianza es baja. Cada caja del diagrama cita módulo o ruta HTTP.
 
-**Qué resultados aparecen.** Un evaluador debe poder seguir una solicitud
-desde el POST hasta el escalamiento sin leer el código. Los tres ADR deben
-decir qué se descartó, no solo qué se eligió.
+**Qué resultados aparecen.** Un evaluador puede seguir una solicitud desde el
+POST hasta el escalamiento sin leer el código. Los tres ADR dicen qué se
+descartó (n8n, cola asíncrona, vectores en SQL, etc.), no solo qué se eligió.
 
-**Qué quedó pendiente.** Redactar el documento y los tres ADR.
+**Qué quedó pendiente.** Nada de este ítem documental. La demo en
+`src/orquestacion/` y el cliente webhook siguen en los ítems siguientes.
 
 ### Orquestación (demo mínima)
 
-**Qué se hizo.** Pendiente. El paquete `src/orquestacion/` está reservado.
+**Qué se hizo.** Aún no (fase 2). El paquete `src/orquestacion/` está reservado.
 El flujo a demostrar, aunque sea parcial:
 
 1. Clasificar la solicitud (`src/ia/`).
@@ -755,8 +797,8 @@ El flujo a demostrar, aunque sea parcial:
 3. Redactar la respuesta anclada a citas, o abstenerse.
 4. Escalar a una persona cuando la confianza sea baja o no haya evidencia.
 
-La elección (n8n, orquestador de agentes o código propio) se justifica en el
-ADR 1. No se exige que quede funcionando completo.
+La elección queda fijada en el ADR 1: **código propio** (n8n y frameworks de
+agentes descartados). No se exige que quede funcionando completo.
 
 **Cómo probarlo.** Cuando exista demo:
 
@@ -771,12 +813,12 @@ en `docs/arquitectura.md`.
 **Qué resultados aparecen.** Un caso feliz (vacaciones / incidente con cita)
 y un caso de abstención que escala. No debe inventar plazos ni montos.
 
-**Qué quedó pendiente.** La demo mínima, las pruebas y la justificación del
-orquestador.
+**Qué quedó pendiente.** La demo mínima y las pruebas. La justificación del
+orquestador ya está en `docs/adr/001-orquestador.md`.
 
 ### Integración bidireccional con el mock
 
-**Qué se hizo.** Pendiente. El segundo sistema es
+**Qué se hizo.** Aún no (fase 2). El segundo sistema es
 `POST /webhook/mensajeria` de `materiales/servicio_mock/` (puede recibir el
 mismo evento más de una vez y en desorden; no se modifica). El cliente de la
 etapa 1 ya consume GET/POST; aquí se cierra el ciclo: recepción, envío de
@@ -801,46 +843,47 @@ pruebas de reintento.
 
 ### Diseño de datos (relacional y vectorial)
 
-**Qué se hizo.** Pendiente. La API de la etapa 2 guarda en memoria a
-propósito. Aquí se documenta (no hace falta migrar ya) el modelo relacional
-de tickets y trazabilidad, más la estrategia de indexación que ya usa el RAG:
-tamaño de fragmento, modelo de embeddings, métrica cosine y umbral
-`RAG_MIN_SCORE`. Eso alimenta el ADR 3.
+**Qué se hizo.** Documentado en `docs/arquitectura.md` §4 y
+`docs/adr/003-diseno-datos.md`. La API de la etapa 2 guarda en memoria a
+propósito. El diseño objetivo separa hechos relacionales (solicitud,
+clasificación, consulta, escalamiento, evento_salida) del índice Chroma
+(cosine, chunking por cláusula, sidecar hash/modelo/dimensión) que ya usa el
+RAG. **No hay migración aplicada** en esta entrega.
 
-**Cómo probarlo.** Leer `docs/arquitectura.md` y `docs/adr/003-diseno-datos.md`
-junto a `materiales/datos/esquema.sql` y `src/rag/`.
+**Cómo probarlo.** Leer esos dos documentos junto a
+`materiales/datos/esquema.sql` y `src/rag/`.
 
-**Qué resultados aparecen.** Tablas previstas (solicitud, clasificación,
-consulta de política, escalamiento, evento de webhook) y por qué el índice
-vectorial no vive en el mismo motor que los tickets.
+**Qué resultados aparecen.** Tablas previstas y la justificación de por qué
+el índice vectorial no vive en el mismo motor que los tickets.
 
-**Qué quedó pendiente.** El documento. Una migración SQLite/MySQL queda fuera
-si el tiempo no alcanza; se declara aquí.
+**Qué quedó pendiente.** La migración SQLite/MySQL (fuera si el tiempo no
+alcanza; queda declarado). El documento de diseño de este ítem está cerrado.
 
 ### Secretos, ambientes y control de costo
 
-**Qué se hizo.** Pendiente de documentar como diseño de etapa 4. La etapa 2
-ya separa `.env` / `.env.example`, precedencia proceso → archivo → default y
-`SecretStr`. Falta explicitar ambientes (development / test / production) y
-el control de costo: estimación mensual por tokens con supuestos, presupuesto
-máximo, alerta y qué hace el sistema al superarlo (dejar de llamar al LLM y
-quedar en degradado / abstención, no tumbar el alta de solicitudes).
+**Qué se hizo.** Documentado en `docs/arquitectura.md` §5. La etapa 2 ya
+separa `.env` / `.env.example`, precedencia proceso → archivo → default,
+`SecretStr` y `APP_ENV`. La arquitectura añade la tabla de supuestos de
+tokens, el techo demo (USD 50), la política al superarlo (degradar IA / no
+tumbar el alta) y el gap del contador por instancia.
 
-**Cómo probarlo.** Contrastar `docs/arquitectura.md` con `.env.example` y con
-los logs JSON (latencia ya existe; tokens consumidos son de la etapa 3).
+**Cómo probarlo.** Contrastar `docs/arquitectura.md` §5 con `.env.example` y
+con `GET /metricas/resumen` (latencia y tokens ya existen).
 
-**Qué resultados aparecen.** Una tabla de supuestos (solicitudes/día, tokens
-por clasificación, tokens por consulta RAG, precio del modelo) y un techo
-mensual con la acción al rebasarlo.
+**Qué resultados aparecen.** Supuestos declarados, techo y acción al
+rebasarlo, sin secretos en el repo.
 
-**Qué quedó pendiente.** El cálculo, la alerta y la política al superar el
-presupuesto.
+**Qué quedó pendiente.** Enganchar el corte real (`modo_ahorro`) al código;
+hoy la política está escrita. Persistencia del contador mensual = diseño
+ADR 3.
 
 ### Cierre de la etapa 4
 
-**Qué quedó pendiente.** Los seis ítems anteriores, la declaración de uso de
-IA de esta etapa y, si hay tiempo, dejar la orquestación funcionando de punta
-a punta (criterio de escalabilidad, no obligatorio).
+**Qué quedó pendiente.** Demo mínima de orquestación, cliente webhook con
+backoff/pruebas e (opcional) corte de presupuesto en código. Ya cerrados:
+arquitectura, tres ADR, diseño de datos documentado y política de costo.
+Actualizar la declaración de IA de esta etapa si se implementa la demo o el
+webhook.
 
 ---
 
@@ -852,19 +895,23 @@ modelo clásico puede ser un cuaderno con línea base y matriz de confusión,
 sin integrarlo a la API. Las métricas deben quedar en Git **antes** de
 implementar la suite de evaluación.
 
-**Método de esta entrega.** Igual que etapa 4, en dos fases:
+**Estado actual.** Solo existe el **plan de fase 1** en
+`docs/etapa5_fase1_plan.md` (paso a paso, orden Git y control de errores).
+Ese plan **no acredita** la etapa: faltan decisión R-01…R-03, métricas
+previas, gold ≥ 50, suite en CI, notebook ML, comparación, revisión del PR,
+estándar de ingeniería y video.
 
-1. Fase 1 — plan documental: paso a paso y control de errores por ítem →
-   `docs/etapa5_fase1_plan.md` (**listo para revisión**).
-2. Fase 2 — tu retroalimentación + entregables en orden Git (métricas/gold
-   antes que la suite).
+**Método previsto (dos fases):**
+
+1. Fase 1 — plan documental → `docs/etapa5_fase1_plan.md` (**hecho**).
+2. Fase 2 — entregables en orden Git (métricas/gold **antes** que la suite).
 
 El video de 5 min y la revisión de `pr_para_revision.diff` van con la entrega,
 no ocupan la sesión en vivo. El detalle operativo de cada ítem está en el plan.
 
 ### Documento de decisión (R-01, R-02, R-03)
 
-**Qué se hizo.** Pendiente. El enunciado está en
+**Qué se hizo.** Aún no (fase 2). El enunciado está en
 `materiales/n5/requerimientos_negocio.md`. Irá en
 `docs/decision_ia_vs_automatizacion.md`. Para cada requerimiento: IA,
 automatización tradicional o secuencia combinada; criterios (volumen,
@@ -892,8 +939,8 @@ por qué la IA a veces es la peor opción.
 
 ### Métricas previas y conjunto de referencia
 
-**Qué se hizo.** Pendiente. Este ítem tiene que existir en el historial **antes**
-de la suite y del modelo. Irá en `docs/metricas_previas.md` y en
+**Qué se hizo.** Aún no (fase 2). Este ítem tiene que existir en el historial
+**antes** de la suite y del modelo. Irá en `docs/metricas_previas.md` y en
 `data/referencia/conjunto_referencia.csv` (parte de la plantilla
 `materiales/n5/plantilla_conjunto_referencia.csv`; completar hasta ≥ 50 casos
 etiquetados a mano). El original de `materiales/` no se modifica.
@@ -928,9 +975,9 @@ commitearlos antes de implementar evaluación.
 
 ### Suite de evaluación automatizada
 
-**Qué se hizo.** Pendiente. Irá en `tests/evaluacion/` y se ejecutará en CI
-cuando el pipeline de la etapa 3 exista. Debe reportar las métricas de
-arriba y **fallar** si el resultado cae bajo el umbral.
+**Qué se hizo.** Aún no (fase 2). Irá en `tests/evaluacion/` y se enganchará
+al CI de la etapa 3 (`.github/workflows/ci.yml`, ya operativo). Debe reportar
+las métricas de arriba y **fallar** si el resultado cae bajo el umbral.
 
 **Cómo probarlo.** Cuando exista:
 
@@ -947,7 +994,7 @@ del commit de métricas.
 
 ### Modelo clásico, comparación y recomendación
 
-**Qué se hizo.** Pendiente. Cuaderno previsto:
+**Qué se hizo.** Aún no (fase 2). Cuaderno previsto:
 `notebooks/linea_base_clasificacion.ipynb` sobre
 `materiales/datos/tickets_historicos.csv` (o el limpio de `data/salida/`).
 Partición, línea base, matriz de confusión y lectura de negocio. No hace
@@ -969,13 +1016,15 @@ modelo clásico, cuándo no usar ninguno.
 
 ### Revisión del PR y estándar de ingeniería
 
-**Qué se hizo.** Pendiente. Revisión escrita de
+**Qué se hizo.** Aún no (fase 2). Revisión escrita de
 `materiales/revision/pr_para_revision.diff` en `docs/revision_pr.md`. El diff
 es un artefacto defectuoso a propósito (clave en código, SQL concatenado,
 etc.); no se copia ni se “arregla” el archivo de `materiales/`.
 
 Estándar previsto: `docs/estandar_ingenieria_ia.md` — qué se permite generar
-con IA, qué se revisa siempre y qué nunca se acepta sin prueba.
+con IA, qué se revisa siempre y qué nunca se acepta sin prueba. Puede ampliar
+`docs/estandar_revision_codigo_ia.md` (ya entregado en etapa 3) en lugar de
+partir de cero.
 
 **Cómo probarlo.** Abrir el diff y el documento de revisión. Cada hallazgo
 debe citar archivo/línea, severidad y corrección propuesta. El estándar se
@@ -991,9 +1040,10 @@ qué se haría distinto) se graba al cerrar la entrega.
 
 ### Cierre de la etapa 5
 
-**Qué quedó pendiente.** Los cinco ítems anteriores, el video, la
-autoevaluación de competencias (formato PC-GTH-68, fuera de este repo) y la
-declaración de uso de IA de esta etapa.
+**Qué quedó pendiente.** Los entregables de fase 2, el video y la
+autoevaluación PC-GTH-68 (fuera de este repo). La declaración de esta etapa
+ya refleja el plan de fase 1; actualizarla al cerrar decisión, gold, suite,
+notebook o revisión del PR. El plan no sustituye esos entregables.
 
 ---
 
@@ -1014,12 +1064,13 @@ src/
   orquestacion/      clasificar → consultar → responder → escalar (etapa 4)
 tests/               mismo mapa que src/; evaluacion/ en la etapa 5
 sql/                 consultas de la etapa 1 y runner
-docs/                declaración de IA, contrato, funcional, causas del legado
-docs/adr/            tres ADR (etapa 4, pendiente)
-ci/                  pipeline (etapa 3; workflow en `.github/workflows/ci.yml`)
+docs/                declaración IA, contrato, funcional, legado, CI,
+                     seguridad, estándar, arquitectura y planes
+docs/adr/            ADR 001 orquestador, 002 webhook, 003 datos (etapa 4)
+.github/workflows/   CI etapa 3 (ci.yml)
 web/                 listado Angular con filtros (etapa 2, opcional)
-notebooks/           línea base clásica (etapa 5, pendiente)
+notebooks/           línea base clásica (etapa 5, pendiente de fase 2)
 materiales/          paquete original; no modificar mock ni PDF
 data/salida/         CSV e índice RAG locales; no se versionan
-data/referencia/     conjunto gold ≥ 50 casos (etapa 5, pendiente)
+data/referencia/     conjunto gold ≥ 50 casos (etapa 5, pendiente de fase 2)
 ```
