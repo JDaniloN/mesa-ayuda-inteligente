@@ -37,13 +37,15 @@ Un solo README raíz, como pide el enunciado: hasta qué etapa llegué y dónde 
 
 ## Hasta qué etapa llegué
 
-Etapa 0 hecha. Etapa 1: CSV, mock y SQL cerrados. Falta llenar a mano la declaración de uso de IA de la etapa 1.
+Etapa 0 hecha. Las implementaciones de las etapas 1 y 2 están cerradas y
+verificadas. Antes de entregar, el candidato debe completar a mano la
+declaración de uso de IA de ambas etapas.
 
 | Estado | Etapa | Qué es |
 |---|---|---|
 | Hecha | 0. Contextualización | Enunciado, materiales y alcance Middle II |
-| En curso | 1. Fundamentos | Limpieza del CSV, cliente del mock y tres consultas SQL |
-| En curso | 2. Autonomía e integración | API, IA, legado, configuración y documentación. Falta Angular |
+| Implementación hecha | 1. Fundamentos | Limpieza del CSV, cliente del mock y tres consultas SQL; declaración de IA manual pendiente |
+| Implementación hecha | 2. Autonomía e integración | API, IA, legado, configuración, documentación y Angular; declaración de IA manual pendiente |
 | Pendiente | 3. Complejidad y calidad | RAG, abstención, CI, seguridad |
 | Pendiente | 4. Arquitectura y orquestación | Diseño, ADR y demo mínima |
 | Pendiente | 5. Estrategia y evaluación | Decisión, métricas previas, ML clásico |
@@ -72,6 +74,7 @@ El README de esta etapa cubre lo que pide el enunciado: **cómo instalar, cómo 
 | 2 | Configuración tipada y logs JSON | `src/configuracion.py` y `src/observabilidad.py` | `python -m pytest tests/configuracion/ tests/observabilidad/` |
 | 2 | Contrato técnico de la API | `docs/api_contrato.md` | `/docs`, `/openapi.json` y `python -m pytest tests/api/test_contrato_openapi.py` |
 | 2 | Descripción funcional de la API | `docs/api_funcional.md` | Contrastar escenarios con `tests/api/` |
+| 2 | Pantalla Angular opcional | `web/` | `npm test -- --watch=false` y `npm run build` dentro de `web/` |
 | 2–5 | IA, RAG, orquestación, ADR | `src/`, `tests/`, `docs/`, `ci/` | Pendiente al cerrar cada etapa |
 | Todas | Paquete original (solo lectura) | `materiales/` | No se modifica |
 
@@ -94,6 +97,7 @@ tests/              mismo mapa que src/
 sql/                consultas de la etapa 1 y runner
 docs/               declaración, aclaraciones, arquitectura, ADR
 ci/                 pipeline (etapa 3)
+web/                listado Angular con filtros (etapa 2)
 materiales/         paquete original; no modificar mock ni PDF
 data/salida/        CSV locales; no se versionan
 ```
@@ -114,6 +118,14 @@ Copy-Item .env.example .env
 Editar `.env`: `API_TOKEN` (Swagger), `MOCK_TOKEN` (mock) e `IA_API_KEY` (OpenAI, opcional). `.env.example` es el contrato para revisión; `.env` está en `.gitignore`.
 
 Dependencias: `pandas`, `pytest`, `httpx`, `pydantic`, `pydantic-settings`, `fastapi`, `uvicorn`, `python-dotenv`. SQLite viene con Python.
+
+Frontend opcional (Node 24 y npm):
+
+```
+cd web
+npm ci
+cd ..
+```
 
 El mock es un proceso aparte y no se modifica:
 
@@ -195,6 +207,22 @@ El camino feliz en Swagger no basta. Evidencia del degradado: `python -m pytest 
 python -m pytest tests/api/ tests/ia/ -q
 ```
 
+**Pantalla Angular (etapa 2, opcional)**
+
+Con la API ejecutándose en el puerto 8000, en otra terminal:
+
+```
+cd web
+npm start
+```
+
+Abrir http://localhost:4200. Ingrese el mismo `API_TOKEN` local que usa Swagger; nunca la clave de OpenAI. “Mostrar” permite comprobarlo antes de enviarlo. “Validar y consultar” hace una petición protegida, carga la lista automáticamente y solo entonces enciende el indicador autenticado. El token vive solo en memoria y se elimina al recargar, al recibir 401 o al pulsar “Eliminar token”.
+
+```
+npm test -- --watch=false
+npm run build
+```
+
 ---
 
 ## Qué hace
@@ -219,7 +247,7 @@ Tres archivos sobre `esquema.sql` (120 tickets; **otro dataset** que el CSV):
 
 ### API propia (etapa 2)
 
-Tres recursos: crear (`POST /solicitudes`), consultar estado (`GET /solicitudes/{id}`), listar con filtros (`GET /solicitudes`). `GET /health` como el mock (sin token, `estado: operativo`) más `clasificador` (`proveedor` / `sin_clave`) para no confundir “servicio arriba” con “LLM configurado”. Validación Pydantic, códigos 201/200/401/404/409/422/503 y error uniforme `{ "error": { "codigo", "mensaje" } }`. Listado sin coincidencias: **200** `[]`, no 404. Clasificación: LLM (catálogo cerrado de la limpieza) o degradado `Sin clasificar`/`Media` si el proveedor falla; el POST no pasa a 500.
+Tres recursos: crear (`POST /solicitudes`), consultar estado (`GET /solicitudes/{id}`), listar con filtros (`GET /solicitudes`). `GET /health` como el mock (sin token, `estado: operativo`) más `clasificador` (`proveedor` / `sin_clave`) para no confundir “servicio arriba” con “LLM configurado”. Validación Pydantic, códigos 201/200/401/404/409/422/503 y error uniforme `{ "error": { "codigo", "mensaje" } }`. Listado sin coincidencias: **200** `[]`, no 404. Clasificación: LLM (catálogo cerrado de la limpieza) o degradado `Sin clasificar`/`Media` si el proveedor falla; el POST no pasa a 500. Una `Idempotency-Key` ya resuelta se consulta antes de llamar a IA, evitando repetir latencia y costo en un reintento. CORS se restringe al Angular local, sin cookies, métodos ni cabeceras comodín.
 
 El contrato ejecutable vive en `/openapi.json` y Swagger `/docs`; `tests/api/test_contrato_openapi.py` evita que rutas, códigos o esquemas se separen del comportamiento. `docs/api_contrato.md` explica integración, idempotencia y límites. `docs/api_funcional.md` explica qué resuelve, para quién y qué queda fuera.
 
@@ -230,6 +258,10 @@ El original queda intacto en `materiales/legacy/legacy_module.py`. La copia de `
 ### Configuración y observabilidad (etapa 2)
 
 `src/configuracion.py` valida puertos, timeouts, reintentos, entorno y nivel de log; los tokens usan `SecretStr`. `.env` sirve para desarrollo y nunca se versiona; `.env.example` contiene solo el contrato. `src/observabilidad.py` emite JSON a stdout y limita los campos permitidos para no registrar `Authorization`, claves, asunto, descripción ni solicitante. El middleware correlaciona la respuesta y los eventos de IA mediante `X-Request-ID`.
+
+### Pantalla Angular (etapa 2, opcional)
+
+`web/` consume el listado mediante un proxy local sin credenciales, aplica filtros exactos y representa carga, vacío, 401, 503 y desconexión. La tabla omite descripción y solicitante. Un interceptor adjunta el Bearer únicamente a rutas relativas `/api/`; el token se introduce como contraseña y permanece en memoria, nunca en archivos, URL, cookies, `localStorage` o `sessionStorage`.
 
 ---
 
@@ -265,15 +297,17 @@ El original queda intacto en `materiales/legacy/legacy_module.py`. La copia de `
 
 **API — persistencia.** Memoria con candado. Alternativa descartada: SQLite ya (es diseño de datos de la etapa 4). Al reiniciar el proceso se pierde el listado.
 
-**API — secretos.** Bearer `API_TOKEN`, distinto de `MOCK_TOKEN`. Viven en `.env` (no en el repo; el contrato es `.env.example`). Sin token configurado: 503, no un 401 ambiguo. `Idempotency-Key`: misma clave y mismo cuerpo → 200 y el mismo id; otro cuerpo → 409.
+**API — secretos e idempotencia.** Bearer `API_TOKEN`, distinto de `MOCK_TOKEN`. Viven en `.env` (no en el repo; el contrato es `.env.example`). Sin token configurado: 503, no un 401 ambiguo. `Idempotency-Key`: misma clave y mismo cuerpo → 200 y el mismo id sin volver a invocar IA; otro cuerpo → 409. La verificación previa evita efectos externos repetidos en reintentos secuenciales; el repositorio vuelve a verificar bajo candado para conservar consistencia si dos peticiones compiten.
 
 **API — documentación.** OpenAPI se genera desde rutas y modelos y se fija con pruebas; no se versiona otro `openapi.json` que pueda quedar obsoleto. Markdown añade decisiones técnicas y contexto funcional sin copiar todo el esquema. Se mantiene la URL sin `/v1` para no romper la prueba; una ruptura futura deberá introducir una ruta versionada.
 
 **IA — desacople.** La API llama `clasificar` (`PuertoClasificador`), no a OpenAI. Así se inyecta un fijo en pruebas y mañana se cambia de proveedor sin tocar `src/api/`. Alternativa descartada: pegar `httpx` en la ruta del POST.
 
-**IA — contrato HTTP.** `/v1/chat/completions` (OpenAI y compatibles: Groq, modelo local). Timeout **8 s** (el mock eran 5 s: latencia máxima 2,5 s; un chat tarda más en el primer token). Un reintento ante cualquier fallo del proveedor; si el segundo también falla → degradado. Alternativa descartada: reintentar solo 429 (un 500 transitorio también merece un segundo tiro; un 401 se gasta una llamada de más, se acepta por no ramificar).
+**IA — contrato HTTP.** `/v1/chat/completions` (OpenAI y compatibles: Groq, modelo local). Timeout **8 s** (el mock eran 5 s: latencia máxima 2,5 s; un chat tarda más en el primer token). Hay un reintento únicamente para fallos potencialmente transitorios: timeout, conexión, 408, 425, 429 y 5xx seleccionados. Un 401, JSON inválido o etiqueta fuera de catálogo degrada de inmediato porque repetir la misma petición no los corrige. Se descartaron reintentos indiscriminados e infinitos.
 
 **IA — catálogo cerrado.** Las etiquetas salen de `CATEGORIAS_VALIDAS` / `PRIORIDADES_VALIDAS` de la limpieza. Si el modelo inventa una, no se guarda: degradado. Alternativa descartada: fiarse del JSON del LLM (rompe el resumen área × prioridad).
+
+**IA — prompting y contexto.** El sistema incorpora los criterios exactos de prioridad de `POL-TIC-05` (servicio esencial/sede, proceso o más de diez usuarios, un usuario con alternativa, sin afectación), exige abstención ante ambigüedad y trata asunto/descripción como datos no confiables. La entrada se serializa como JSON para conservar sus roles semánticos; instrucciones incluidas dentro del ticket no cambian las reglas. Tres ejemplos fijan caída general, solicitud planificada e intento de inyección. Se descartó `response_format` obligatorio porque el adaptador también acepta proveedores compatibles que no implementan esa extensión; el parser y el catálogo validan la salida.
 
 **IA — degradado, no regex.** Si no hay clave, timeout, 401, 429, 500, JSON roto o etiqueta fuera de catálogo: `Sin clasificar` / `Media` y `origen=degradado`. El ticket **sí se crea** (201). Tras ver el LLM en vivo (vacaciones urgentes → Vacaciones/Crítica; texto ambiguo → el propio modelo elige Sin clasificar), el regex de negocio **sigue fuera**: duplicaría el catálogo, falsearía “vacaciones” en un correo de software, y el `origen` dejaría de decir la verdad. Alternativa descartada: 502 si OpenAI falla (el colaborador se queda sin solicitud).
 
@@ -283,7 +317,9 @@ El original queda intacto en `materiales/legacy/legacy_module.py`. La copia de `
 
 **Logs — stdout y campos permitidos.** Se usa `logging` estándar con JSON, sin crear archivos locales ni añadir otra biblioteca. El `request_id` permite seguir petición → IA → respuesta. Solo se serializan campos permitidos; el cuerpo del ticket, correo, tokens, prompt y respuesta del proveedor quedan fuera. Alternativa descartada: registrar el cuerpo completo para depurar (filtra datos personales y secretos).
 
-**Secretos — alcance del escaneo.** El código, las pruebas y la documentación desarrollados no contienen claves con formato `sk-proj-…`; `tests/seguridad/` lo fija. El paquete original incluye un patrón de ese tipo dentro de `materiales/revision/pr_para_revision.diff`, precisamente como artefacto defectuoso para la revisión final. No se usa, copia ni modifica.
+**Secretos — alcance del escaneo.** El código, las pruebas y la documentación desarrollados no contienen claves OpenAI, GitHub, AWS ni llaves privadas con formatos conocidos; `tests/seguridad/` también comprueba que `.env` no esté rastreado. El paquete original incluye un patrón tipo `sk-proj-…` dentro de `materiales/revision/pr_para_revision.diff`, precisamente como artefacto defectuoso para la revisión final. Se excluye porque `materiales/` es evidencia inmutable; no se usa, copia ni modifica.
+
+**Angular — token en navegador.** Un frontend no puede ocultar una credencial compilada. Se descartaron `environment.ts`, proxy con cabecera y almacenamiento web. La demo solicita `API_TOKEN`, lo guarda solo en memoria y restringe el interceptor a `/api/` para no enviarlo a un dominio externo. Producción requiere identidad corporativa y tokens personales de corta duración.
 
 **Legado — corrección mínima.** No se reescribe ni se modifica el archivo entregado. S1 respeta el contrato inclusivo; S2 usa `None` sin eliminar el acumulador explícito; S3 cuenta tickets con contador positivo y no inventa `1` cuando falta el dato. Se descartó corregir S3 con `estado.lower()` porque solo arreglaría mayúsculas, no tickets que cambiaron de estado después de reabrirse.
 
@@ -297,10 +333,10 @@ El original queda intacto en `materiales/legacy/legacy_module.py`. La copia de `
 
 **SQL.** No se instala MySQL “para la foto”. Docker (MariaDB) existe en el equipo; no se usó porque SQLite ya demostró las tres consultas. Oracle exigiría secuencia + `TIMESTAMP`, como dice el encabezado de `esquema.sql`. No se modifica `esquema.sql`. No se filtra la consulta 03 por `estado = 'Reabierto'` ni con `INNER JOIN` al historial: en este esquema dejaría fuera 8 tickets.
 
-**Etapa 1 aún abierta.** Declaración de uso de IA de esta etapa, a mano, en `docs/declaracion_uso_ia.md`.
+**Cierre documental manual.** Las declaraciones de uso de IA de las etapas 1 y 2 deben completarse a mano en `docs/declaracion_uso_ia.md`; la implementación no puede decidir por el candidato qué conservó, corrigió o verificó personalmente.
 
 **API.** Persistencia, cambio de estado, autenticación corporativa, permisos por rol y paginación por cursor.
 
 **IA.** No hay regex de categoría. No se versiona `IA_API_KEY`. No se usa Assistants ni streaming. Un modelo local o Groq caben cambiando `IA_API_BASE_URL`; no van en este entregable.
 
-**Etapa 2 (resto).** Pantalla Angular opcional con listado y filtros.
+**Angular.** No crea ni edita solicitudes, no implementa login corporativo y no guarda el token entre recargas. Es una bandeja de consulta, no un panel completo.

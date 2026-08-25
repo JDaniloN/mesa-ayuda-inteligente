@@ -4,6 +4,7 @@ Tres recursos más /health. La clasificación va por src/ia (puerto),
 no por el proveedor HTTP directo.
 """
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import logging
 from time import perf_counter
@@ -20,6 +21,7 @@ from src.api.repositorio import Repositorio
 from src.api.rutas import CABECERA_REQUEST_ID, router
 from src.configuracion import Configuracion, obtener_configuracion
 from src.ia.fachada import FachadaClasificador
+from src.ia.puerto import PuertoClasificador
 from src.observabilidad import (
     configurar_logging,
     establecer_request_id,
@@ -33,11 +35,26 @@ def create_app(
     *,
     repositorio: Repositorio | None = None,
     api_token: str | None = None,
-    clasificador=None,
+    clasificador: PuertoClasificador | None = None,
     configuracion: Configuracion | None = None,
 ) -> FastAPI:
     config = configuracion or obtener_configuracion()
     configurar_logging(config.log_level, config.app_env)
+    clasificador_real = (
+        clasificador
+        if clasificador is not None
+        else FachadaClasificador.desde_configuracion(config)
+    )
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        try:
+            yield
+        finally:
+            cerrar = getattr(clasificador_real, "close", None)
+            if callable(cerrar):
+                cerrar()
+
     app = FastAPI(
         title="Mesa de Ayuda Inteligente",
         version="0.2.0",
@@ -45,14 +62,11 @@ def create_app(
             "API interna para crear, consultar y listar solicitudes de soporte. "
             "La clasificación usa un proveedor de IA con modo degradado."
         ),
+        lifespan=lifespan,
     )
     app.state.configuracion = config
     app.state.repositorio = repositorio or Repositorio()
-    app.state.clasificador = (
-        clasificador
-        if clasificador is not None
-        else FachadaClasificador.desde_configuracion(config)
-    )
+    app.state.clasificador = clasificador_real
     if api_token is not None:
         app.state.api_token = api_token
     else:
@@ -97,7 +111,9 @@ def create_app(
                     "exception_type": type(exc).__name__,
                 },
             )
-            raise
+            response = await error_no_controlado(request, exc)
+            response.headers["X-Request-ID"] = request_id
+            return response
         finally:
             restablecer_request_id(token_contexto)
 
@@ -107,9 +123,9 @@ def create_app(
             "http://localhost:4200",
             "http://127.0.0.1:4200",
         ],
-        allow_credentials=True,
-        allow_headers=["*"],
-        allow_methods=["*"],
+        allow_credentials=False,
+        allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+        allow_methods=["GET", "POST"],
         expose_headers=["X-Request-ID"],
     )
     app.add_exception_handler(RequestValidationError, validacion_invalida)
@@ -139,7 +155,9 @@ def create_app(
         },
     )
     def health():
-        tiene = getattr(app.state.clasificador, "_proveedor", None) is not None
+        tiene = bool(
+            getattr(app.state.clasificador, "proveedor_configurado", False)
+        )
         return {
             "estado": "operativo",
             "hora": datetime.now(timezone.utc).isoformat(),

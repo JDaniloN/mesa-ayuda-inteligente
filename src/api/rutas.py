@@ -18,6 +18,7 @@ from src.api.auth import exigir_token
 from src.api.errores import cuerpo
 from src.api.modelos import RespuestaError, SolicitudEntrada, SolicitudSalida
 from src.api.repositorio import ClaveIdempotenciaEnUso, Repositorio
+from src.ia.catalogo import contexto_solicitud
 
 router = APIRouter(
     prefix="/solicitudes",
@@ -84,14 +85,30 @@ def crear(
     ),
 ):
     clave = (idempotency_key or "").strip() or None
-    texto = f"{entrada.asunto}\n{entrada.descripcion}".strip()
-    clasificacion = request.app.state.clasificador.clasificar(texto)
-    try:
-        salida, nueva = _repo(request).crear(entrada, clave, clasificacion)
-    except ClaveIdempotenciaEnUso as exc:
-        raise HTTPException(status_code=409, detail=cuerpo("conflicto", str(exc))) from exc
-    response.status_code = 201 if nueva else 200
-    return salida
+    repositorio = _repo(request)
+    with repositorio.serializar_idempotencia(clave):
+        try:
+            previa = repositorio.recuperar_idempotente(entrada, clave)
+        except ClaveIdempotenciaEnUso as exc:
+            raise HTTPException(
+                status_code=409,
+                detail=cuerpo("conflicto", str(exc)),
+            ) from exc
+        if previa is not None:
+            response.status_code = status.HTTP_200_OK
+            return previa
+
+        contexto = contexto_solicitud(entrada.asunto, entrada.descripcion)
+        clasificacion = request.app.state.clasificador.clasificar(contexto)
+        try:
+            salida, nueva = repositorio.crear(entrada, clave, clasificacion)
+        except ClaveIdempotenciaEnUso as exc:
+            raise HTTPException(
+                status_code=409,
+                detail=cuerpo("conflicto", str(exc)),
+            ) from exc
+        response.status_code = 201 if nueva else 200
+        return salida
 
 
 @router.get(

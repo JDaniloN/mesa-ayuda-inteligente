@@ -23,6 +23,31 @@ def test_entorno_del_proceso_prevalece_sobre_dotenv(monkeypatch, tmp_path):
     assert config.api_token.get_secret_value() == "token-sistema"
 
 
+def test_dotenv_provee_valores_si_el_proceso_no_los_define(monkeypatch, tmp_path):
+    dotenv = tmp_path / ".env"
+    dotenv.write_text(
+        "API_PORT=8123\nLOG_LEVEL=WARNING\nAPI_TOKEN=token-archivo\n",
+        encoding="utf-8",
+    )
+    for nombre in ("API_PORT", "LOG_LEVEL", "API_TOKEN"):
+        monkeypatch.delenv(nombre, raising=False)
+
+    config = Configuracion(_env_file=dotenv)
+
+    assert config.api_port == 8123
+    assert config.log_level == "WARNING"
+    assert config.api_token.get_secret_value() == "token-archivo"
+
+
+def test_alias_mock_base_url_conserva_compatibilidad(monkeypatch):
+    monkeypatch.delenv("MOCK_URL", raising=False)
+    monkeypatch.setenv("MOCK_BASE_URL", "https://mock-alias.test")
+
+    config = Configuracion(_env_file=None)
+
+    assert config.mock_url == "https://mock-alias.test"
+
+
 @pytest.mark.parametrize(
     ("campo", "valor"),
     [

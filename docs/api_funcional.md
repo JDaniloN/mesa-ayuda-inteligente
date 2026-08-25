@@ -30,7 +30,8 @@ prioridad para revisar la carga más reciente.
 ### Aplicación interna
 
 Una pantalla Angular u otra integración consume el contrato HTTP. No necesita
-conocer OpenAI ni la lógica de clasificación.
+conocer OpenAI ni la lógica de clasificación. La implementación en `web/`
+muestra la bandeja, aplica filtros y representa carga, vacío y fallos.
 
 ## Flujo principal
 
@@ -61,6 +62,8 @@ clasificación como si proviniera del modelo.
 - La prioridad es `Crítica`, `Alta`, `Media` o `Baja`.
 - Una clave de idempotencia evita duplicar el mismo envío.
 - Reutilizar esa clave con datos diferentes es un conflicto.
+- Repetir la misma clave y los mismos datos reutiliza también la clasificación:
+  no vuelve a consumir tiempo ni cuota del proveedor de IA.
 - Un listado sin resultados es exitoso y devuelve una lista vacía.
 - Los filtros actuales requieren coincidencia exacta.
 - Cada respuesta entrega un identificador de seguimiento técnico

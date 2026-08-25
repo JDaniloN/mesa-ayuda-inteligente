@@ -1,5 +1,6 @@
 import httpx
 
+from src.configuracion import Configuracion
 from src.ia.fachada import FachadaClasificador
 from src.ia.proveedor_http import ProveedorHttp
 
@@ -83,14 +84,18 @@ def test_timeout_degrada():
 
 
 def test_401_degrada_sin_inventar_categoria():
+    n = {"hits": 0}
+
     def handler(request: httpx.Request) -> httpx.Response:
+        n["hits"] += 1
         return httpx.Response(401, json={"error": {"code": "invalid_api_key"}})
 
-    r = FachadaClasificador(proveedor=_http(handler), reintentos=0).clasificar(
+    r = FachadaClasificador(proveedor=_http(handler), reintentos=3).clasificar(
         "solicito vacaciones urgentes"
     )
     assert r.origen == "degradado"
     assert r.categoria == "Sin clasificar"
+    assert n["hits"] == 1
 
 
 def test_429_degrada():
@@ -127,3 +132,42 @@ def test_json_entre_markdown_sigue_siendo_proveedor():
     r = FachadaClasificador(proveedor=_http(handler)).clasificar("vacaciones")
     assert r.origen == "proveedor"
     assert r.categoria == "Vacaciones"
+
+
+def test_json_invalido_no_se_reintenta_por_ser_error_determinista():
+    n = {"hits": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        n["hits"] += 1
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "respuesta inválida"}}]},
+        )
+
+    r = FachadaClasificador(
+        proveedor=_http(handler),
+        reintentos=3,
+    ).clasificar("x")
+
+    assert r.origen == "degradado"
+    assert n["hits"] == 1
+
+
+def test_desde_configuracion_expone_estado_publico_del_proveedor():
+    sin_clave = Configuracion(
+        _env_file=None,
+        ia_api_base_url="https://ia.test/v1",
+        ia_api_key="",
+    )
+    con_clave = Configuracion(
+        _env_file=None,
+        ia_api_base_url="https://ia.test/v1",
+        ia_api_key="clave-de-prueba",
+    )
+
+    degradado = FachadaClasificador.desde_configuracion(sin_clave)
+    proveedor = FachadaClasificador.desde_configuracion(con_clave)
+
+    assert degradado.proveedor_configurado is False
+    assert proveedor.proveedor_configurado is True
+    proveedor.close()

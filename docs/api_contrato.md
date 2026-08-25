@@ -104,20 +104,25 @@ Cabecera opcional:
 Idempotency-Key: <clave estable del cliente>
 ```
 
-Flujo: validar → clasificar → guardar → responder.
+Flujo: validar → serializar la clave → recuperar si ya existe → estructurar
+contexto → clasificar → guardar → responder. Peticiones con claves distintas
+no se bloquean entre sí.
 
 Respuestas:
 
 - `201`: solicitud nueva.
 - `200`: la misma clave y el mismo cuerpo ya existían; devuelve la solicitud
-  anterior sin duplicarla.
+  anterior sin duplicarla ni volver a invocar el proveedor de IA.
 - `401`: Bearer ausente o rechazado.
 - `409`: la clave ya fue usada con un cuerpo diferente.
 - `422`: cuerpo fuera del contrato.
 - `500`: fallo inesperado.
 - `503`: falta `API_TOKEN`.
 
-La clave de idempotencia vive en memoria y se pierde al reiniciar.
+La clave y su bloqueo viven en memoria y se pierden al reiniciar. La
+serialización por clave también evita dos clasificaciones simultáneas para el
+mismo reintento; el repositorio verifica de nuevo bajo su candado antes de
+insertar.
 
 ## Consultar una solicitud
 
@@ -171,9 +176,16 @@ aparece `sin_clave`.
 
 ## Proveedor de IA y degradación
 
-El POST intenta clasificar mediante el puerto de IA. Si no hay clave, ocurre
-timeout, conexión fallida, HTTP de error, JSON inválido o etiqueta fuera del
-catálogo, la solicitud se crea igualmente:
+El POST envía asunto y descripción como campos JSON separados. El prompt trata
+esos campos como datos no confiables, rechaza instrucciones incluidas dentro
+del ticket, incorpora la matriz de prioridad de `POL-TIC-05`, aporta ejemplos
+y exige abstención cuando no hay evidencia suficiente.
+
+El clasificador reintenta una vez solo ante errores potencialmente transitorios
+(timeout, conexión, 408, 425, 429 y 5xx seleccionados). Un 401, JSON inválido o
+etiqueta fuera de catálogo degrada inmediatamente: repetir el mismo contenido
+no corregiría la causa. Si no hay clave o el proveedor no entrega una salida
+válida, la solicitud se crea igualmente:
 
 ```json
 {
@@ -184,6 +196,8 @@ catálogo, la solicitud se crea igualmente:
 ```
 
 Un fallo del proveedor no se traduce en `502`: impediría registrar el ticket.
+No se fuerza `response_format` porque algunos proveedores compatibles no lo
+implementan; el parser y la validación contra el catálogo cierran el contrato.
 
 ## Configuración y operación
 
@@ -206,7 +220,9 @@ Los eventos propios se escriben como JSON a stdout. No se registran
 - Límite simple: no hay cursor ni total de páginas.
 - Sin prefijo `/v1`: se mantiene el contrato de la prueba. Una ruptura futura
   deberá introducir una ruta versionada.
-- CORS habilitado únicamente para Angular local en los puertos definidos.
+- CORS habilitado únicamente para Angular local, sin cookies, con métodos
+  `GET`/`POST` y las cabeceras `Authorization`, `Content-Type` e
+  `Idempotency-Key`.
 
 Estas limitaciones son explícitas; no se presentan como capacidades
 productivas.

@@ -14,6 +14,8 @@ definido como inclusivo.
 
 **Prueba de regresión:** `test_s1_filtrar_por_periodo_incluye_ambos_extremos`
 comprueba los dos extremos y descarta los días anterior y posterior.
+`test_s1_informe_mensual_conserva_tickets_del_primero_y_ultimo_dia` verifica
+además el síntoma completo en el flujo que reportó el área.
 
 **Alternativa descartada:** representar el período como
 `inicio <= fecha < primer_dia_siguiente` también evita errores de límites,

@@ -211,7 +211,10 @@ OpenAPI: `http://127.0.0.1:8000/docs`. Token: `API_TOKEN` de `.env` (no el del m
 
 ### ¿Por qué `.env` y no variables en la terminal?
 
-El evaluador ve `.env.example` (contrato, sin secretos). `.env` no se sube. Pegar `$env:IA_API_KEY` en cada sesión acaba en capturas. Al arrancar, el archivo pisa un `$env:` viejo de la misma terminal.
+El evaluador ve `.env.example` (contrato, sin secretos). `.env` no se sube.
+Una variable del proceso gana sobre el archivo, como requieren CI, Docker y
+producción. Si quedó un `$env:` viejo en PowerShell se elimina antes de arrancar;
+no se invierte la precedencia para ocultar ese error local.
 
 ### ¿Por qué el listado vacío es 200 y no 404?
 
@@ -228,6 +231,18 @@ OpenAPI y validación salen del contrato Pydantic. Flask habría sido más códi
 ### ¿Por qué memoria y no SQLite?
 
 El enunciado de este ítem pide recursos y códigos, no el modelo relacional (etapa 4). Al reiniciar se pierde el listado; está declarado.
+
+### ¿Por qué comprobar idempotencia antes de llamar a IA?
+
+La idempotencia no es solo “no duplicar filas”. Si un cliente reintenta por un
+timeout y la API vuelve a consultar al modelo, repite costo, latencia y una
+operación externa aunque termine devolviendo el mismo ticket. Por eso una clave
+existente se resuelve primero. Un bloqueo por clave cubre solicitudes
+simultáneas sin frenar claves distintas; el repositorio vuelve a validar el
+cuerpo bajo candado.
+
+**Cómo lo digo:** *El estado final ya era idempotente; ahora también lo es el
+efecto costoso de clasificación.*
 
 ### ¿Por qué 503 si falta API_TOKEN?
 
@@ -255,9 +270,30 @@ Evidencia: `test_post_201_si_el_llm_responde_500`. En vivo: quite `IA_API_KEY`, 
 
 Se evaluó **después** de ver el LLM. El camino principal ya etiqueta Vacaciones/Crítica. Un texto ambiguo (calendario + módulo) el propio modelo deja en `Sin clasificar` con `origen=proveedor`: no es un fallo, es abstención. El regex copiaría el catálogo de la limpieza, acertaría el caso feliz y mentiría en otros. El degradado sin regex dice la verdad: *no clasificamos, el ticket existe*.
 
+### ¿Qué context engineering se aplicó?
+
+El prompt no se limita a pedir “clasifique”. Deriva el catálogo desde la misma
+fuente de la limpieza e incorpora la sección 3 de `POL-TIC-05`: Crítica para
+servicio esencial o sede, Alta para proceso completo o más de diez usuarios,
+Media para un usuario con alternativa y Baja sin afectación operativa. No eleva
+solo por la palabra “urgente”, exige abstención y contiene tres ejemplos: caída
+general, solicitud planificada e intento de inyección. Asunto y descripción
+viajan como JSON separado y se declaran datos no confiables; una orden escrita
+dentro del ticket no puede reemplazar las reglas del sistema.
+
+Se descartó forzar `response_format` porque el adaptador acepta OpenAI y
+proveedores compatibles que pueden no soportarlo. La salida sigue cerrada por
+parseo JSON y validación de catálogo. Las pruebas fijan prompt, contexto,
+payload, respuestas malformadas e instrucciones adversarias.
+
 ### ¿Por qué timeout 8 s y un reintento?
 
-El mock mide 2,5 s de latencia → 5 s. Un chat puede tardar más en el primer token; 8 s no confunde “lento” con “caído”. Un reintento cubre 500/timeout; el 401 también se reintenta (una llamada de más) para no ramificar. Alternativa descartada: reintentos infinitos o backoff largo (el POST de la mesa se quedaría colgado).
+El mock mide 2,5 s de latencia → 5 s. Un chat puede tardar más en el primer
+token; 8 s no confunde “lento” con “caído”. Un reintento cubre timeout,
+conexión, 408, 425, 429 y 5xx transitorios. Un 401, JSON inválido o etiqueta
+fuera de catálogo degrada en el primer intento: repetir la misma entrada no
+corrige credenciales ni formato. Alternativa descartada: reintentos
+indiscriminados, infinitos o con espera larga.
 
 ### ¿401, 429 y degradado son lo mismo?
 
@@ -368,8 +404,10 @@ git ls-files .env
 
 El primer comando de Git debe mostrar `.env`; el segundo no debe mostrar nada.
 
-El escaneo del código desarrollado excluye `materiales/`: el paquete original
-trae un patrón tipo `sk-proj-…` dentro de
+El escaneo busca formatos conocidos de OpenAI, GitHub, AWS y llaves privadas;
+también ejecuta `git ls-files --error-unmatch .env` para fijar que el archivo
+local no quede rastreado. Excluye `materiales/`: el paquete original trae un
+patrón tipo `sk-proj-…` dentro de
 `materiales/revision/pr_para_revision.diff` como parte del PR defectuoso que
 se revisará al final. No es una clave copiada desde `.env`, no se utiliza y el
 material original no se modifica.
@@ -413,3 +451,58 @@ silenciosamente este contrato.
 La API registra, clasifica, consulta y lista. Todavía no persiste al reiniciar,
 no cambia estados, no asigna agentes y usa un Bearer compartido. Es una
 demostración integrable, no un producto listo para producción.
+
+---
+
+## Pantalla Angular opcional (etapa 2)
+
+### ¿Por qué el token no está en `environment.ts`?
+
+Angular se ejecuta en el navegador: todo valor compilado puede inspeccionarse.
+`environment.ts`, un `config.json` o una cabecera escrita en el proxy no
+convierten una clave en secreto.
+
+**Cómo lo digo:** *No prometo secreto donde técnicamente no puede existir. En
+la demo el usuario introduce API_TOKEN, queda solo en memoria y producción
+debe usar identidad corporativa con tokens personales y cortos.*
+
+### ¿Cómo se evita enviarlo a un tercero?
+
+El interceptor solo añade `Authorization` cuando la URL comienza por `/api/`.
+Una petición absoluta a otro dominio no recibe la cabecera. Hay prueba para
+ambos caminos.
+
+### ¿Dónde se guarda?
+
+No se usa `localStorage`, `sessionStorage`, cookie, URL ni archivo. El campo es
+de tipo `password`, se vacía al cargar el valor y el servicio lo elimina al
+recargar, destruir el componente, pulsar “Eliminar token” o recibir 401.
+
+“Mostrar” solo cambia temporalmente el tipo del campo mientras el usuario
+revisa lo que escribió; el valor guardado nunca se vuelve a renderizar. El
+indicador no confunde “token presente” con “autenticado”: pasa a verde solo
+después de que `GET /solicitudes` responde 200. Al guardar también ejecuta la
+primera consulta para evitar una segunda acción ambigua.
+
+El formulario previene explícitamente el submit nativo y el campo carece de
+`name`: aunque una defensa se quite por error, el navegador no debe construir
+`?api-token=...`. `test_impide_que_el_formulario_serialice_el_token_en_la_url`
+fija esa regresión.
+
+### ¿Qué bordes muestra la pantalla?
+
+Carga, lista vacía (200), token rechazado (401), API sin configurar (503),
+desconexión y error inesperado. Cuando la API entrega `X-Request-ID`, se
+muestra como referencia para buscar el evento en logs.
+
+### ¿Por qué no muestra descripción ni solicitante?
+
+La bandeja solo necesita identificar y priorizar. Omitir esos campos reduce
+la exposición de información personal; el contrato TypeScript los conserva
+porque la API los devuelve, pero la tabla no los renderiza.
+
+### ¿Qué se descartó?
+
+Crear solicitudes, editar estado, login simulado, dashboard y paginación
+completa. El punto opcional pide consumir el listado con filtros; ampliar el
+alcance escondería la integración y sus decisiones de seguridad.

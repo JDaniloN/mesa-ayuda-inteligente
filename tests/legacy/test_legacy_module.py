@@ -24,6 +24,35 @@ def test_s1_filtrar_por_periodo_incluye_ambos_extremos():
     assert [ticket["id"] for ticket in resultado] == ["inicio", "medio", "fin"]
 
 
+def test_s1_informe_mensual_conserva_tickets_del_primero_y_ultimo_dia():
+    tickets = [
+        {
+            "id": "inicio",
+            "fecha_creacion": "2025-03-01",
+            "area": "Aplicaciones",
+            "reaperturas": "0",
+        },
+        {
+            "id": "fin",
+            "fecha_creacion": "2025-03-31",
+            "area": "Aplicaciones",
+            "reaperturas": "1",
+        },
+        {
+            "id": "fuera",
+            "fecha_creacion": "2025-04-01",
+            "area": "Aplicaciones",
+            "reaperturas": "0",
+        },
+    ]
+
+    informe = legacy_module.informe_mensual(tickets, 2025, 3)
+
+    assert informe["total"] == 2
+    assert informe["por_area"] == {"Aplicaciones": 2}
+    assert informe["tasa_reapertura"] == 50.0
+
+
 def test_s2_resumir_por_area_no_comparte_datos_entre_llamadas():
     modulo = reload(legacy_module)
 

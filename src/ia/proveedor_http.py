@@ -97,4 +97,10 @@ def _parsear_json(contenido: str) -> tuple[str, str]:
         raise ErrorProveedorIA("json") from exc
     if not isinstance(data, dict):
         raise ErrorProveedorIA("json")
-    return str(data.get("categoria", "")).strip(), str(data.get("prioridad", "")).strip()
+    if set(data) != {"categoria", "prioridad"}:
+        raise ErrorProveedorIA("json")
+    categoria = data["categoria"]
+    prioridad = data["prioridad"]
+    if not isinstance(categoria, str) or not isinstance(prioridad, str):
+        raise ErrorProveedorIA("json")
+    return categoria.strip(), prioridad.strip()

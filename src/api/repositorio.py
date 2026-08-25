@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import threading
+from collections.abc import Iterator
 from typing import Optional
 from uuid import uuid4
 
@@ -21,6 +23,25 @@ class Repositorio:
         self._lock = threading.Lock()
         self._por_id: dict[str, SolicitudSalida] = {}
         self._idempotencia: dict[str, str] = {}
+        self._bloqueos_idempotencia: dict[str, threading.Lock] = {}
+
+    @contextmanager
+    def serializar_idempotencia(
+        self,
+        clave_idempotencia: Optional[str],
+    ) -> Iterator[None]:
+        """Serializa solo peticiones con la misma clave, incluso durante IA."""
+
+        if not clave_idempotencia:
+            yield
+            return
+        with self._lock:
+            bloqueo = self._bloqueos_idempotencia.setdefault(
+                clave_idempotencia,
+                threading.Lock(),
+            )
+        with bloqueo:
+            yield
 
     def crear(
         self,
@@ -31,15 +52,9 @@ class Repositorio:
         """Devuelve (solicitud, es_nueva). Misma clave y mismo cuerpo reusa."""
         clase = clasificacion or DEGRADADO
         with self._lock:
-            if clave_idempotencia:
-                existente_id = self._idempotencia.get(clave_idempotencia)
-                if existente_id:
-                    previa = self._por_id[existente_id]
-                    if not _misma_entrada(previa, entrada):
-                        raise ClaveIdempotenciaEnUso(
-                            "La Idempotency-Key ya se usó con otro cuerpo."
-                        )
-                    return previa, False
+            previa = self._resolver_idempotencia(entrada, clave_idempotencia)
+            if previa is not None:
+                return previa, False
             ident = f"SOL-{uuid4().hex[:8].upper()}"
             salida = SolicitudSalida(
                 id=ident,
@@ -58,6 +73,16 @@ class Repositorio:
             if clave_idempotencia:
                 self._idempotencia[clave_idempotencia] = ident
             return salida, True
+
+    def recuperar_idempotente(
+        self,
+        entrada: SolicitudEntrada,
+        clave_idempotencia: Optional[str],
+    ) -> Optional[SolicitudSalida]:
+        """Recupera o rechaza una clave antes de ejecutar efectos externos."""
+
+        with self._lock:
+            return self._resolver_idempotencia(entrada, clave_idempotencia)
 
     def obtener(self, ident: str) -> Optional[SolicitudSalida]:
         with self._lock:
@@ -80,6 +105,23 @@ class Repositorio:
             filas = [s for s in filas if s.prioridad == prioridad]
         filas.sort(key=lambda s: s.fecha_creacion, reverse=True)
         return filas[:limite]
+
+    def _resolver_idempotencia(
+        self,
+        entrada: SolicitudEntrada,
+        clave_idempotencia: Optional[str],
+    ) -> Optional[SolicitudSalida]:
+        if not clave_idempotencia:
+            return None
+        existente_id = self._idempotencia.get(clave_idempotencia)
+        if not existente_id:
+            return None
+        previa = self._por_id[existente_id]
+        if not _misma_entrada(previa, entrada):
+            raise ClaveIdempotenciaEnUso(
+                "La Idempotency-Key ya se usó con otro cuerpo."
+            )
+        return previa
 
 
 def _misma_entrada(previa: SolicitudSalida, entrada: SolicitudEntrada) -> bool:

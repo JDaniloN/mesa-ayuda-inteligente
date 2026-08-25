@@ -13,6 +13,17 @@ from src.ia.proveedor_http import ErrorProveedorIA, ProveedorHttp
 log = logging.getLogger("mesa.ia")
 
 REINTENTOS_POR_DEFECTO = 1
+ERRORES_TRANSITORIOS = {
+    "timeout",
+    "conexion",
+    "http_408",
+    "http_425",
+    "http_429",
+    "http_500",
+    "http_502",
+    "http_503",
+    "http_504",
+}
 
 
 class FachadaClasificador:
@@ -23,6 +34,18 @@ class FachadaClasificador:
     ) -> None:
         self._proveedor = proveedor
         self._reintentos = max(0, reintentos)
+
+    @property
+    def proveedor_configurado(self) -> bool:
+        """Indica configuración sin exponer el adaptador HTTP privado."""
+
+        return self._proveedor is not None
+
+    def close(self) -> None:
+        """Libera el cliente HTTP propio al apagar la aplicación."""
+
+        if self._proveedor is not None:
+            self._proveedor.close()
 
     @classmethod
     def desde_configuracion(
@@ -86,7 +109,7 @@ class FachadaClasificador:
                         "reason": exc.codigo,
                     },
                 )
-                if i + 1 >= intentos:
+                if exc.codigo not in ERRORES_TRANSITORIOS or i + 1 >= intentos:
                     log.warning(
                         "ia_degradada",
                         extra={
